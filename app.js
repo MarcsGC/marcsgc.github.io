@@ -132,6 +132,9 @@ const TEMPLATES = [
     make: () => mk(t("Gastos del mes"), t("Categoría"), [[t("Euros")], [t("% del total"), `${t("redondear")}(A/${t("suma")}(A)*100; 1)`]],
       [[t("Alquiler"), "550"], [t("Comida"), "240"], [t("Transporte"), "60"], [t("Ocio"), "95"], [t("Facturas"), "110"], [t("Otros"), "45"]],
       [{ name: t("Reparto"), type: "doughnut", one: 0, showValues: true, legend: "bottom" }, { name: t("Ranking"), type: "barh", series: [0], showValues: true, markMax: true }]) },
+  { key: "peso", name: () => t("Peso corporal"), desc: () => t("Apunta tu peso cada día con un toque: la fecha se pone sola."),
+    make: () => mk(t("Peso corporal"), t("Fecha"), [[t("Peso (kg)")], [t("Notas"), null, "text"]], [],
+      [{ name: t("Evolución"), type: "line", series: [0], zero: false, markMin: true, markMax: true }], { sumCol: 0 }, { labelType: "date" }) },
   { key: "diario", name: () => t("Registro diario"), desc: () => t("Una fila por día: peso, sueño o lo que quieras seguir."),
     make: () => { const ds = lastDays(10), w = ["72,4", "72,1", "72,3", "71,8", "71,9", "71,5", "71,6", "71,2", "71,4", "70,9"], h = ["7", "6,5", "8", "7,5", "6", "7", "8,5", "7", "6,5", "7,5"];
       return mk(t("Registro diario"), t("Fecha"), [[t("Peso (kg)")], [t("Horas de sueño")]], ds.map((d, i) => [d, w[i], h[i]]),
@@ -195,13 +198,19 @@ function initState() {
 const cur = () => state.projects.find(p => p.id === state.current);
 const saveNow = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { toast(t("No se han podido guardar los cambios: el almacenamiento está lleno.")); } };
 const saveSoon = debounce(saveNow, 250);
-function persist() { saveSoon(); trackSoon(); }
+function persist() { const p = cur(); if (p) p.updated = Date.now(); saveSoon(); trackSoon(); }
+// verde si el cambio acerca al objetivo, rojo si aleja; sin objetivo, neutro
+function trendClass(diff, last, c) {
+  const p = cur(), first = p.cols.find(x => x.kind === "num");
+  if (!diff || !Number.isFinite(p.goal) || (c && first && c !== first)) return "";
+  return Math.abs(last - p.goal) < Math.abs(last - diff - p.goal) ? "up" : "down";
+}
 
 /* =========================================================
    Deshacer y rehacer
    ========================================================= */
 const HIST = {};
-const snapFields = ["name", "labelName", "labelType", "cols", "rows", "charts", "filters", "palette"];
+const snapFields = ["name", "labelName", "labelType", "cols", "rows", "charts", "filters", "palette", "goal"];
 const snap = p => JSON.stringify(snapFields.map(k => p[k]));
 const hist = () => (HIST[state.current] = HIST[state.current] || { past: [], future: [], last: snap(cur()) });
 function track() {
@@ -423,7 +432,7 @@ function aboutSheet() {
     <p class="hint"><a href="privacidad.html" target="_blank" rel="noopener" style="color:var(--accent)">${t("Política de privacidad")}</a></p>
     <div class="actions"><button class="btn primary" data-act="close">${t("Cerrar")}</button></div>`, () => {});
 }
-const APP_VERSION = "3.0";
+const APP_VERSION = "3.1";
 
 /* =========================================================
    Tabla de datos
@@ -903,8 +912,91 @@ function showOnboarding() {
   draw();
 }
 
+
+/* =========================================================
+   Registro rápido (proyectos con fechas)
+   ========================================================= */
+const quickCols = () => cur().cols.filter(c => c.kind !== "formula").slice(0, 4);
+let quickDate = null;
+function renderQuick() {
+  const p = cur(), on = p.labelType === "date" && quickCols().length > 0;
+  ["#quick", "#quickPanel"].forEach(sel => { const el = $(sel); el.hidden = !on; if (!on) el.innerHTML = ""; });
+  if (!on) return;
+  const date = quickDate || todayISO(), isToday = date === todayISO();
+  const ri = p.rows.findIndex(r => r.l === date), row = ri >= 0 ? p.rows[ri] : null;
+  const d = data(), first = quickCols().find(c => c.kind === "num");
+  const ph = c => { if (c.kind === "text") return ""; const v = d.vals(c.id); return v.length ? fmt(d.series(c.id).filter(x => x != null).pop()) : ""; };
+  const stats = first ? quickStats(first) : "";
+  const html = pre => `<div class="qhead"><b>${t("Registro rápido")}</b>
+      <span class="qdate">${isToday ? t("Hoy") + ", " : ""}<input type="date" data-q="date" value="${date}" max="${todayISO()}" aria-label="${t("Fecha")}"></span></div>
+    <div class="qfields">${quickCols().map(c => `<label>${esc(colName(c))}<input type="text" ${c.kind === "num" ? 'inputmode="decimal"' : 'class="txt"'} data-qc="${c.id}" id="${pre}_${c.id}" value="${esc(row ? row.c[c.id] ?? "" : "")}" placeholder="${esc(ph(c))}" enterkeyhint="done" autocomplete="off"></label>`).join("")}</div>
+    <div class="qrow"><button class="btn primary" data-q="save">${ICON(row ? IC.edit : IC.plus)}${row ? t("Actualizar") : t("Guardar")}</button>${first ? `<button class="btn" data-q="goal">${t("Objetivo")}${Number.isFinite(p.goal) ? ": " + fmt(p.goal) : ""}</button>` : ""}</div>
+    ${stats ? `<div class="qstats">${stats}</div>` : ""}`;
+  const focused = document.activeElement && document.activeElement.closest(".quick") ? document.activeElement.id : null;
+  $("#quick").innerHTML = html("qd"); $("#quickPanel").innerHTML = html("qp");
+  if (focused && document.getElementById(focused)) document.getElementById(focused).focus();
+}
+function quickStats(c) {
+  const p = cur(), d = data(), ser = d.series(c.id), pts = [];
+  ser.forEach((v, k) => { if (v != null && d.ts && Number.isFinite(d.ts[k])) pts.push([d.ts[k], v]); });
+  if (!pts.length) return `<span>${t("Escribe tu primer valor y pulsa Guardar. La fecha se pone sola.")}</span>`;
+  pts.sort((a, b) => a[0] - b[0]);
+  const last = pts[pts.length - 1], prev = pts[pts.length - 2], firstP = pts[0];
+  const arrow = x => (x ? `<span class="${trendClass(x, last[1], c)}">${x > 0 ? "▲" : "▼"} ${fmt(Math.abs(x))}</span>` : "=");
+  const out = [`<span>${t("Último")}: <b>${fmt(last[1])}</b> (${fmtDate(isoOf(new Date(last[0])))})</span>`];
+  if (prev) out.push(`<span>${arrow(last[1] - prev[1])} ${t("desde el anterior")}</span>`);
+  if (pts.length > 2) out.push(`<span>${arrow(last[1] - firstP[1])} ${t("desde el {d}", { d: fmtDate(isoOf(new Date(firstP[0]))) })}</span>`);
+  const wk = pts.filter(x => x[0] > last[0] - 7 * 864e5).map(x => x[1]);
+  if (wk.length > 1) out.push(`<span>${t("Media 7 días")}: <b>${fmt(S.mean(wk))}</b></span>`);
+  if (Number.isFinite(p.goal)) { const r = last[1] - p.goal; out.push(Math.abs(r) < 1e-9 ? `<span class="up">${t("¡Objetivo conseguido!")}</span>` : `<span>${t("A {x} del objetivo", { x: `<b>${fmt(Math.abs(r))}</b>` })}</span>`); }
+  return out.join("");
+}
+function quickSave(box) {
+  const p = cur(), date = box.querySelector("[data-q=date]").value || todayISO();
+  const vals = {}; let any = false;
+  box.querySelectorAll("[data-qc]").forEach(i => { const v = i.value.trim(); if (v !== "") { vals[i.dataset.qc] = v; any = true; } });
+  if (!any) { toast(t("Escribe al menos un valor")); box.querySelector("[data-qc]")?.focus(); return; }
+  const bad = quickCols().find(c => c.kind === "num" && vals[c.id] !== undefined && !Number.isFinite(S.parseNum(vals[c.id])));
+  if (bad) { toast(t("«{v}» no es un número", { v: vals[bad.id] })); return; }
+  let r = p.rows.find(x => x.l === date);
+  const existed = !!r;
+  if (!r) { r = { l: date, c: {} }; p.rows = p.rows.filter(x => String(x.l ?? "").trim() || Object.keys(x.c).length); p.rows.push(r); }
+  Object.assign(r.c, vals);
+  p.rows.sort((a, b) => (!a.l) - (!b.l) || String(a.l).localeCompare(String(b.l)));
+  quickDate = null; dirty(); persist(); renderTable(); refresh();
+  toast(existed ? t("Actualizado · {d}", { d: fmtDate(date, true) }) : t("Guardado · {d}", { d: fmtDate(date, true) }), t("Deshacer"), undo);
+  document.activeElement?.blur?.();
+}
+function goalSheet() {
+  const p = cur();
+  openSheet(`<h3>${t("Objetivo")}</h3><p class="hint">${t("Aparecerá como una línea en tus gráficos y verás cuánto te falta.")}</p>
+    <div class="field"><input type="text" inputmode="decimal" id="goalIn" value="${Number.isFinite(p.goal) ? esc(String(p.goal).replace(".", LANG === "es" ? "," : ".")) : ""}" placeholder="${t("Ej.: 70")}" style="font-family:var(--mono);font-size:1.4rem"></div>
+    <div class="actions"><button class="btn ghost" data-act="rm" ${Number.isFinite(p.goal) ? "" : "disabled"}>${t("Quitar objetivo")}</button><button class="btn primary" data-act="ok">${t("Guardar")}</button></div>`,
+  act => {
+    const label = t("Objetivo");
+    const setLines = v => p.charts.forEach(ch => { ch.lines = (ch.lines || []).filter(l => !l._goal); if (Number.isFinite(v) && ["line", "area", "bar", "combo"].includes(ch.type)) ch.lines.push({ value: v, label, color: "", _goal: true }); });
+    if (act === "ok") { const v = S.parseNum($("#goalIn").value); if (!Number.isFinite(v)) { toast(t("Escribe un número")); return; } p.goal = v; setLines(v); }
+    if (act === "rm") { delete p.goal; setLines(NaN); }
+    if (act === "ok" || act === "rm") { persist(); refresh(); closeSheet(); }
+  });
+  setTimeout(() => $("#goalIn").select(), 60);
+}
+["#quick", "#quickPanel"].forEach(sel => {
+  const box = $(sel);
+  box.addEventListener("click", e => { const b = e.target.closest("[data-q]"); if (!b || b.tagName === "INPUT") return; if (b.dataset.q === "save") quickSave(box); if (b.dataset.q === "goal") goalSheet(); });
+  box.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("[data-qc]")) { e.preventDefault(); quickSave(box); } });
+  box.addEventListener("change", e => { if (e.target.dataset.q === "date") { quickDate = e.target.value && e.target.value !== todayISO() ? e.target.value : null; renderQuick(); } });
+});
+function openQuickFromShortcut() {
+  const dated = state.projects.filter(p => p.labelType === "date" && p.cols.length).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  const target = (cur().labelType === "date" ? cur() : null) || dated[0];
+  if (!target) return;
+  if (target !== cur()) { state.current = target.id; hist(); dirty(); renderAll(); }
+  showView("view-data"); setTimeout(() => { const i = $("#quick [data-qc]"); i?.focus(); }, 150);
+}
+
 /* =========================================================
    Ciclo de renderizado
    ========================================================= */
-function refresh() { updateCount(); renderChartUI(); renderStats(); if (currentView === "view-panel") renderPanel(); }
+function refresh() { updateCount(); renderQuick(); renderChartUI(); renderStats(); if (currentView === "view-panel") renderPanel(); }
 function renderAll() { dirty(); renderProjects(); renderTable(); refresh(); updateUndo(); }

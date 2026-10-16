@@ -1,32 +1,13 @@
-# Gráficalo · versión 3
+# Gráficalo · versión 3.1
 
-## Cómo actualizar tu web (y la app de Google Play)
+Novedad: **registro rápido** para proyectos con fechas (por ejemplo, la plantilla «Peso corporal»). Escribe el valor, pulsa Guardar y la fecha de hoy se pone sola.
 
-1. En tu repositorio `marcsgc.github.io`, borra los archivos sueltos de la versión anterior que ya no se usan: `chart.umd.js` y `xlsx.full.min.js` (ahora están dentro de la carpeta `lib`). Si no los borras no pasa nada; solo ocupan sitio.
-2. Pulsa **Add file → Upload files** y arrastra **todo el contenido** de esta carpeta, incluidas las carpetas `lib`, `ocr` e `icons`.
-   - Si el navegador no sube las carpetas al arrastrarlas, súbelas por separado: entra en **Add file → Upload files** y arrastra cada carpeta.
+## Cómo actualizar tu web
+
+1. En tu repositorio `marcsgc.github.io`, pulsa **Add file → Upload files**.
+2. Arrastra **todo el contenido** de esta carpeta, incluidas las carpetas `lib`, `ocr` e `icons` (si no se suben al arrastrar, súbelas por separado).
 3. Pulsa **Commit changes** y espera un par de minutos.
 
-No borres la carpeta `.well-known` ni el archivo `.nojekyll`.
+No borres `.well-known` ni `.nojekyll`. No hace falta generar un `.aab` nuevo.
 
-La app de Google Play carga esta web, así que **no hace falta generar un `.aab` nuevo**.
-
-## Archivos
-
-| Archivo | Para qué sirve |
-|---|---|
-| `index.html` | Estructura y diseño |
-| `i18n.js` | Textos en inglés |
-| `stats.js` | Cálculos: estadística, regresiones, distribuciones, contrastes y fórmulas |
-| `app.js` | Datos, proyectos, deshacer, filtros, importación, menú y ajustes |
-| `charts.js` | Gráficos, anotaciones, panel, pantalla completa e imagen |
-| `statsview.js` | Pantalla de estadísticas y paso a paso |
-| `export.js` | PDF, Excel, copia de seguridad y enlaces para compartir |
-| `ocr.js` | Leer tablas desde fotos |
-| `main.js` | Arranque |
-| `sw.js` | Modo sin conexión. **Cambia `VERSION` cada vez que publiques cambios** |
-| `lib/` | Chart.js, zoom, SheetJS (Excel) y jsPDF |
-| `ocr/` | Tesseract.js y el idioma español (solo se descarga la primera vez que alguien lee una foto) |
-| `privacidad.html` | Política de privacidad actualizada (español e inglés) con tu correo |
-
-Los proyectos guardados de las versiones 1 y 2 se convierten solos.
+Cada vez que publiques cambios, cambia `VERSION` en `sw.js` para que los móviles descarguen la versión nueva.

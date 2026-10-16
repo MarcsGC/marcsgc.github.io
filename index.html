@@ -273,6 +273,23 @@ details.help code{font-family:var(--mono);color:var(--ink)}
 .palettes .sw{display:flex;gap:3px}
 .palettes .sw i{width:16px;height:16px;border-radius:3px;display:block}
 
+
+/* registro rápido */
+.quick{border:1.5px solid var(--accent);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;background:linear-gradient(var(--accent-soft),var(--sheet) 70%)}
+.quick .qhead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.quick .qhead b{font-family:var(--display);font-weight:600;font-size:1.05rem}
+.quick .qdate{display:flex;align-items:center;gap:6px;font-size:.88rem;color:var(--muted)}
+.quick .qdate input{padding:5px 8px;font-size:.88rem}
+.quick .qfields{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.quick .qfields label{display:flex;flex-direction:column;gap:4px;font-size:.78rem;color:var(--muted);min-width:0}
+.quick .qfields input{font-family:var(--mono);font-size:1.6rem;padding:10px 12px;width:100%;border-radius:10px;border:1px solid var(--line);background:var(--sheet)}
+.quick .qfields input.txt{font-family:var(--body);font-size:1rem;padding:14px 12px}
+.quick .qrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.quick .qrow .btn.primary{flex:1;min-height:48px;font-size:1.05rem}
+.quick .qstats{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.86rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.quick .qstats b{color:var(--ink);font-family:var(--mono);font-weight:500}
+.quick .qstats .up{color:var(--accent)} .quick .qstats .down{color:var(--danger)}
+
 /* pantalla completa */
 .fs{position:fixed;inset:0;z-index:40;background:var(--sheet);display:flex;flex-direction:column;
   padding:calc(8px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
@@ -320,6 +337,7 @@ details.help code{font-family:var(--mono);color:var(--ink)}
   <main class="views" id="views">
     <section class="view" id="view-data">
       <div class="vhead"><h2 data-t="Datos">Datos</h2><span class="badge" id="rowCount"></span></div>
+      <div class="quick" id="quick" hidden></div>
       <div class="filterbar" id="filterBar" hidden></div>
       <div class="tablewrap" id="tablewrap">
         <table class="data"><thead id="thead"></thead><tbody id="tbody"></tbody></table>
@@ -353,6 +371,7 @@ details.help code{font-family:var(--mono);color:var(--ink)}
 
     <section class="view" id="view-panel" hidden>
       <div class="vhead"><h2 id="panelTitle"></h2><span class="badge warn" id="panelFiltered" hidden></span></div>
+      <div class="quick" id="quickPanel" hidden></div>
       <div class="kpis" id="kpis"></div>
       <div class="panelgrid" id="panelGrid"></div>
     </section>

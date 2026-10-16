@@ -174,6 +174,8 @@ function buildConfig(ch, mode = "main") {
   };
   const annot = horizontal => {
     const notes = (ch.notes || []).map(n => ({ index: noteIndex(n.label), text: n.text }));
+    const lv = (ch.lines || []).map(l => l.value).filter(Number.isFinite);
+    if (lv.length) { const ax = horizontal ? base.scales.x : base.scales.y; ax.suggestedMin = Math.min(...lv); ax.suggestedMax = Math.max(...lv); ax.grace = "6%"; }
     base.plugins.annot = { on: !!((ch.lines || []).length || ch.markMax || ch.markMin || notes.length), lines: ch.lines || [], markMax: ch.markMax, markMin: ch.markMin, notes, horizontal, fs: Math.max(9, fs - 1), font: css("--body"), ink, sheet: css("--sheet"), danger: css("--amber") };
   };
   const labels = d.labels, sel = ch.series.map(colById).filter(c => c && isNum(c));
@@ -542,7 +544,7 @@ function renderPanel() {
     const s = S.describe(v), dot = `<i style="background:${colColor(c)}"></i>`;
     if (p.labelType === "date" && v.length >= 2) {
       const ser = d.series(c.id).filter(x => x != null), last = ser[ser.length - 1], prev = ser[ser.length - 2], diff = last - prev;
-      tiles.push(`<div class="kpi"><span class="k">${dot}${esc(colName(c))} · ${t("último")}</span><span class="v">${fmt(last)}</span><span class="s"><span class="${diff > 0 ? "up" : diff < 0 ? "down" : ""}">${diff > 0 ? "▲" : diff < 0 ? "▼" : "="} ${fmt(Math.abs(diff))}</span> · ${t("media")} ${fmt(s.mean)}</span></div>`);
+      tiles.push(`<div class="kpi"><span class="k">${dot}${esc(colName(c))} · ${t("último")}</span><span class="v">${fmt(last)}</span><span class="s"><span class="${trendClass(diff, last, c)}">${diff > 0 ? "▲" : diff < 0 ? "▼" : "="} ${fmt(Math.abs(diff))}</span> · ${t("media")} ${fmt(s.mean)}</span></div>`);
     } else tiles.push(`<div class="kpi"><span class="k">${dot}${esc(colName(c))} · ${t("media")}</span><span class="v">${fmt(s.mean)}</span><span class="s">${t("total")} ${fmt(s.sum)} · n ${s.n}</span><span class="s">${fmt(s.min)} – ${fmt(s.max)}</span></div>`);
   });
   p.cols.filter(c => c.kind === "text").slice(0, 3).forEach(c => {

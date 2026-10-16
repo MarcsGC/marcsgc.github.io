@@ -31,5 +31,19 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Registro rápido",
+      "short_name": "Apuntar",
+      "description": "Apunta el valor de hoy",
+      "url": "./#quick",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }

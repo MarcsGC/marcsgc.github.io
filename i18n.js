@@ -26,6 +26,11 @@ const EN = {
   "Horas de estudio": "Study hours", "Nota": "Grade", "Dispersión": "Scatter", "Encuesta": "Survey", "Respuestas de texto que se cuentan solas.": "Text answers that count themselves.",
   "Sí": "Yes", "No": "No", "A veces": "Sometimes", "Persona": "Person", "Curso": "Class", "¿Te gusta la app?": "Do you like the app?", "Edad": "Age",
   "Respuestas": "Answers", "Por curso": "By class", "(ejemplo)": "(example)",
+  "Peso corporal": "Body weight", "Apunta tu peso cada día con un toque: la fecha se pone sola.": "Log your weight every day in one tap: the date fills itself in.", "Notas": "Notes",
+  "Registro rápido": "Quick log", "Actualizar": "Update", "Objetivo": "Goal", "Escribe tu primer valor y pulsa Guardar. La fecha se pone sola.": "Type your first value and tap Save. The date fills itself in.",
+  "Último": "Latest", "desde el anterior": "since the previous one", "desde el {d}": "since {d}", "Media 7 días": "7-day average", "¡Objetivo conseguido!": "Goal reached!", "A {x} del objetivo": "{x} from your goal",
+  "Escribe al menos un valor": "Type at least one value", "«{v}» no es un número": "“{v}” isn't a number", "Actualizado · {d}": "Updated · {d}", "Guardado · {d}": "Saved · {d}",
+  "Aparecerá como una línea en tus gráficos y verás cuánto te falta.": "It appears as a line on your charts and shows how far you have to go.", "Ej.: 70": "e.g. 70", "Quitar objetivo": "Remove goal", "Escribe un número": "Type a number",
   // núcleo
   "No se han podido guardar los cambios: el almacenamiento está lleno.": "Your changes couldn't be saved: storage is full.",
   "Deshecho": "Undone", "Rehecho": "Redone", "contiene": "contains", "está vacío": "is empty", "no está vacío": "is not empty",
