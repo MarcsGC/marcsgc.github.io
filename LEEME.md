@@ -1,17 +1,23 @@
-# Gráficalo · versión 3.2
+# Gráficalo · versión 0.3
 
-Novedad: la app está en **7 idiomas** (español, inglés, portugués, francés, italiano, alemán y catalán). Elige sola el idioma del móvil y se puede cambiar en ☰ Menú → Tema e idioma.
+Novedades: 7 idiomas (español, inglés, portugués, francés, italiano, alemán y catalán) y registro rápido para proyectos con fechas.
 
 ## Cómo actualizar tu web
 
 1. En tu repositorio `marcsgc.github.io`, pulsa **Add file → Upload files**.
-2. Arrastra **todo el contenido** de esta carpeta, incluidas las carpetas `lang`, `lib`, `ocr` e `icons` (la carpeta `lang` es nueva; si no se sube al arrastrar, súbela por separado).
+2. Arrastra **todo el contenido** de esta carpeta, incluidas las carpetas `lang`, `lib`, `ocr` e `icons`.
 3. Pulsa **Commit changes** y espera un par de minutos.
 
 No borres `.well-known` ni `.nojekyll`. No hace falta generar un `.aab` nuevo.
 
-Cada vez que publiques cambios, cambia `VERSION` en `sw.js` (ahora `graficalo-v3.2`) y `APP_VERSION` en `app.js`.
+## Numeración de versiones
+
+Cada vez que publiques cambios, sube el número en dos sitios:
+- `app.js` → `APP_VERSION` (lo que se ve en Menú → Acerca de), por ejemplo `"0.4"`.
+- `sw.js` → `VERSION`, por ejemplo `"graficalo-v0.4"`. Si no lo cambias, los móviles seguirán mostrando la versión guardada.
+
+En PWABuilder usa el mismo nombre de versión (App version: 0.3) y sube siempre el version code (1, 2, 3…).
 
 ## Traducciones
 
-Cada idioma está en `lang/xx.js`. Si alguien te sugiere una corrección, busca la frase en ese archivo y cambia el texto que hay después de los dos puntos.
+Cada idioma está en `lang/xx.js`. Para corregir una frase, búscala en ese archivo y cambia el texto que hay después de los dos puntos.
