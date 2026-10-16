@@ -68,7 +68,7 @@ $("#statsBody").addEventListener("click", e => {
   if (a === "toCount") { const p = cur(); let ch = p.charts.find(c => c.type === "count" && c.countCol === s.crossRow && c.splitCol === s.crossCol); if (!ch) { ch = Object.assign(defaultChart(), { name: t("Tabla cruzada"), type: "count", countCol: s.crossRow, splitCol: s.crossCol, countStyle: "stacked" }); p.charts.push(ch); } p.activeChart = ch.id; persist(); showView("view-chart"); renderChartUI(); }
   if (a === "copyFreq") copyText(freqTSV()).then(ok => toast(ok ? t("Tabla copiada. Pégala en Excel o Sheets.") : t("No se pudo copiar")));
   if (a === "copyCross") copyText(crossTSV()).then(ok => toast(ok ? t("Tabla copiada. Pégala en Excel o Sheets.") : t("No se pudo copiar")));
-  if (a === "useData") { const v = data().vals(s.probCol); if (v.length < 2) { toast(t("Esa serie necesita al menos 2 valores.")); return; } s.mu = String(+S.mean(v).toFixed(4)).replace(".", LANG === "es" ? "," : "."); s.sigma = String(+S.sd(v).toFixed(4)).replace(".", LANG === "es" ? "," : "."); saveSoon(); renderStats(); }
+  if (a === "useData") { const v = data().vals(s.probCol); if (v.length < 2) { toast(t("Esa serie necesita al menos 2 valores.")); return; } s.mu = String(+S.mean(v).toFixed(4)).replace(".", DEC()); s.sigma = String(+S.sd(v).toFixed(4)).replace(".", DEC()); saveSoon(); renderStats(); }
 });
 const num = (v, d) => { const n = S.parseNum(v); return Number.isFinite(n) ? n : d; };
 const seg = (key, opts, val) => `<div class="seg" role="group">${opts.map(([v, l]) => `<button data-sa="seg:${key}:${v}" aria-pressed="${v === val}">${l}</button>`).join("")}</div>`;
@@ -134,7 +134,7 @@ function outFreq() {
 }
 function freqTSV() {
   if (!lastFreq) return "";
-  const n = v => String(+(+v).toFixed(4)).replace(".", LANG === "es" ? "," : ".");
+  const n = v => String(+(+v).toFixed(4)).replace(".", DEC());
   if (lastFreq.cat) { const tot = lastFreq.list.reduce((a, x) => a + x.n, 0); return [[nameOf(lastFreq.id), "fi", "hi", "%"], ...lastFreq.list.map(x => [x.key, x.n, n(x.n / tot), n((x.n / tot) * 100)])].map(r => r.join("\t")).join("\n"); }
   const g = lastFreq.grouped;
   return [[g ? t("Intervalo") : t("Valor"), ...(g ? ["xi"] : []), "fi", "Fi", "hi", "Hi", "%"], ...lastFreq.rows.map(r => [g ? `[${n(r.from)}; ${n(r.to)}${r.last ? "]" : ")"}` : n(r.value), ...(g ? [n(r.mark)] : []), r.fi, r.Fi, n(r.hi), n(r.Hi), n(r.hi * 100)])].map(r => r.join("\t")).join("\n");

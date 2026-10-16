@@ -109,7 +109,7 @@ function pdfSheet() {
   });
 }
 // las fuentes estándar de PDF solo admiten Latin-1: sustituimos los símbolos que no lo están
-const pdfSafe = s => String(s ?? "").replace(/−/g, "-").replace(/→/g, "->").replace(/≈/g, "~").replace(/≤/g, "<=").replace(/≥/g, ">=").replace(/≠/g, "!=").replace(/⁴/g, "^4").replace(/√/g, "raiz ").replace(/χ²/g, "Chi²").replace(/[₀-₉]/g, c => "0123456789"["₀₁₂₃₄₅₆₇₈₉".indexOf(c)]).replace(/η²/g, "eta²").replace(/[^\x00-\xFF€…–—‘’“”•]/g, "");
+const pdfSafe = s => String(s ?? "").replace(/−/g, "-").replace(/→/g, "->").replace(/≈/g, "~").replace(/≤/g, "<=").replace(/≥/g, ">=").replace(/≠/g, "!=").replace(/⁴/g, "^4").replace(/√/g, "raiz ").replace(/χ²/g, "Chi²").replace(/[₀-₉]/g, c => "0123456789"["₀₁₂₃₄₅₆₇₈₉".indexOf(c)]).replace(/η²/g, "eta²").replace(/[^\x00-\xFF€…–—‘’“”•œŒ]/g, "");
 async function buildPDF(opt) {
   await loadScript("lib/jspdf.umd.min.js"); await loadScript("lib/jspdf.plugin.autotable.min.js");
   const { jsPDF } = window.jspdf, p = cur(), d = data();

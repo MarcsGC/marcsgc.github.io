@@ -1,8 +1,9 @@
 /* Gráficalo · arranque */
 "use strict";
-(function start() {
-  const auto = (navigator.language || "es").toLowerCase().startsWith("es") ? "es" : "en";
-  LANG = settings.lang || auto; S.setLocale({ decimalComma: LANG === "es" }); document.documentElement.lang = LANG;
+(async function start() {
+  const want = settings.lang && LANGS[settings.lang] ? settings.lang : detectLang();
+  await loadLang(want);
+  LANG = I18N[want] || want === "es" ? want : "es"; S.setLocale({ decimalComma: decimalComma() }); document.documentElement.lang = LANG;
   applyTheme();
   initState();
   hist();

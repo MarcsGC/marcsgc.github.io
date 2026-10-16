@@ -4,11 +4,11 @@ const S = window.GStats;
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const LOC = () => (LANG === "es" ? "es-ES" : "en-US");
+const LOC = () => localeTag();
 const fmt = (n, d = 2) => (Number.isFinite(n) ? n.toLocaleString(LOC(), { maximumFractionDigits: d }) : "—");
 const fmtSig = v => { if (!Number.isFinite(v)) return "—"; const a = Math.abs(v); return v.toLocaleString(LOC(), { maximumSignificantDigits: a >= 1000 ? 7 : 4 }); };
 const fmtP = p => (!Number.isFinite(p) ? "—" : p < 0.0001 ? "< " + fmt(0.0001, 4) : fmt(p, 4));
-const pct = v => fmt(v * 100, 1) + (LANG === "es" ? " %" : "%");
+const pct = v => fmt(v * 100, 1) + (LANG === "en" ? "%" : "\u00a0%");
 const uid = () => Math.random().toString(36).slice(2, 9);
 const L = i => S.indexLetter(i);
 const LABEL = "__label";
@@ -100,7 +100,7 @@ function mk(name, labelName, colDefs, rows, charts = [{}], stats = {}, extra = {
   const id = i => (i === "label" ? LABEL : cols[i] ? cols[i].id : null);
   const p = {
     id: uid(), name, labelName, labelType: extra.labelType || "text", cols, palette: "default", filters: [],
-    rows: rows.map(r => { const c = {}; cols.forEach((col, i) => { if (col.kind !== "formula" && r[i + 1] !== undefined && r[i + 1] !== "") c[col.id] = extra.raw || LANG === "es" ? String(r[i + 1]) : String(r[i + 1]).replace(/^(-?\d+),(\d+)$/, "$1.$2"); }); return { l: r[0] ?? "", c }; }),
+    rows: rows.map(r => { const c = {}; cols.forEach((col, i) => { if (col.kind !== "formula" && r[i + 1] !== undefined && r[i + 1] !== "") c[col.id] = extra.raw || decimalComma() ? String(r[i + 1]) : String(r[i + 1]).replace(/^(-?\d+),(\d+)$/, "$1.$2"); }); return { l: r[0] ?? "", c }; }),
     charts: [], activeChart: null, stats: {}
   };
   const numIdx = cols.map((c, i) => (c.kind !== "text" ? i : -1)).filter(i => i >= 0);
@@ -400,16 +400,17 @@ function settingsSheet() {
   const seg = (k, opts) => `<div class="seg" role="group">${opts.map(([v, l]) => `<button data-act="${k}:${v}" aria-pressed="${(settings[k] || "auto") === v}">${l}</button>`).join("")}</div>`;
   openSheet(`<h3>${t("Tema e idioma")}</h3>
     <div class="setrow"><span>${t("Tema")}</span>${seg("theme", [["auto", t("Automático")], ["light", t("Claro")], ["dark", t("Oscuro")]])}</div>
-    <div class="setrow"><span>${t("Idioma")}</span><div class="seg" role="group"><button data-act="lang:es" aria-pressed="${LANG === "es"}">Español</button><button data-act="lang:en" aria-pressed="${LANG === "en"}">English</button></div></div>
+    <div class="setrow"><label for="langSel">${t("Idioma")}</label><select id="langSel">${Object.entries(LANGS).map(([k, n]) => `<option value="${k}" ${k === LANG ? "selected" : ""}>${n}</option>`).join("")}</select></div>
     <div class="actions"><button class="btn primary" data-act="close">${t("Hecho")}</button></div>`,
   act => {
     const [k, v] = act.split(":");
     if (k === "theme") { settings.theme = v; saveSettings(); applyTheme(); renderTable(); refresh(); settingsSheet(); }
-    if (k === "lang") { settings.lang = v; saveSettings(); setLang(v); settingsSheet(); }
   });
+  $("#langSel").addEventListener("change", async e => { settings.lang = e.target.value; saveSettings(); await setLang(e.target.value); settingsSheet(); });
 }
-function setLang(v) {
-  LANG = v; S.setLocale({ decimalComma: v === "es" }); document.documentElement.lang = v;
+async function setLang(v) {
+  await loadLang(v);
+  LANG = v; S.setLocale({ decimalComma: decimalComma() }); document.documentElement.lang = v;
   translateStatic(); dirty(); renderAll();
 }
 function translateStatic() {
@@ -432,7 +433,7 @@ function aboutSheet() {
     <p class="hint"><a href="privacidad.html" target="_blank" rel="noopener" style="color:var(--accent)">${t("Política de privacidad")}</a></p>
     <div class="actions"><button class="btn primary" data-act="close">${t("Cerrar")}</button></div>`, () => {});
 }
-const APP_VERSION = "3.1";
+const APP_VERSION = "3.2";
 
 /* =========================================================
    Tabla de datos
@@ -542,7 +543,7 @@ function remapFormulas(p, map) {
 function openColumn(id, isNew = false) {
   const p = cur(), c = colById(id), j = p.cols.indexOf(c);
   const letters = p.cols.map((_, k) => L(k)).filter((_, k) => k !== j && p.cols[k].kind !== "text");
-  const a = letters[0] || "A", b = letters[1] || a, sep = LANG === "es" ? ";" : ",";
+  const a = letters[0] || "A", b = letters[1] || a, sep = decimalComma() ? ";" : ",";
   const ex = [`${a}+${b}`, `${a}-${b}`, `(${a}+${b})/2`, `${a}/${t("suma")}(${a})*100`, `${t("redondear")}(${a}${sep} 1)`, `${a}-${t("media")}(${a})`, `${t("si")}(${a}>=5${sep} 1${sep} 0)`];
   let kind = c.kind, autoColor = !c.color;
   openSheet(`<h3>${t("Columna {l}", { l: L(j) })}</h3>
@@ -696,7 +697,7 @@ function sortFilterSheet() {
 function toTSV() {
   const p = cur(), d = data();
   const head = [p.labelName || t("Etiqueta"), ...p.cols.map(c => c.name)];
-  const num = v => (Number.isFinite(v) ? String(v).replace(".", LANG === "es" ? "," : ".") : "");
+  const num = v => (Number.isFinite(v) ? String(v).replace(".", DEC()) : "");
   const rows = p.rows.map((r, i) => [r.l, ...p.cols.map(c => (c.kind === "formula" ? num(d.byId[c.id][i]) : r.c[c.id] ?? ""))]);
   return [head, ...rows].map(r => r.join("\t")).join("\n");
 }
@@ -970,7 +971,7 @@ function quickSave(box) {
 function goalSheet() {
   const p = cur();
   openSheet(`<h3>${t("Objetivo")}</h3><p class="hint">${t("Aparecerá como una línea en tus gráficos y verás cuánto te falta.")}</p>
-    <div class="field"><input type="text" inputmode="decimal" id="goalIn" value="${Number.isFinite(p.goal) ? esc(String(p.goal).replace(".", LANG === "es" ? "," : ".")) : ""}" placeholder="${t("Ej.: 70")}" style="font-family:var(--mono);font-size:1.4rem"></div>
+    <div class="field"><input type="text" inputmode="decimal" id="goalIn" value="${Number.isFinite(p.goal) ? esc(String(p.goal).replace(".", DEC())) : ""}" placeholder="${t("Ej.: 70")}" style="font-family:var(--mono);font-size:1.4rem"></div>
     <div class="actions"><button class="btn ghost" data-act="rm" ${Number.isFinite(p.goal) ? "" : "disabled"}>${t("Quitar objetivo")}</button><button class="btn primary" data-act="ok">${t("Guardar")}</button></div>`,
   act => {
     const label = t("Objetivo");
