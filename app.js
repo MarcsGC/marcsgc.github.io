@@ -1,208 +1,493 @@
-/* Gráficalo · interfaz */
+/* Gráficalo · núcleo: estado, proyectos, tabla, importación, ajustes */
 "use strict";
 const S = window.GStats;
-const $ = s => document.querySelector(s);
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const fmt = (n, d = 2) => (Number.isFinite(n) ? n.toLocaleString("es-ES", { maximumFractionDigits: d }) : "—");
-const fmtSig = v => { if (!Number.isFinite(v)) return "—"; const a = Math.abs(v); return v.toLocaleString("es-ES", { maximumSignificantDigits: a >= 1000 ? 7 : 4 }); };
+const LOC = () => (LANG === "es" ? "es-ES" : "en-US");
+const fmt = (n, d = 2) => (Number.isFinite(n) ? n.toLocaleString(LOC(), { maximumFractionDigits: d }) : "—");
+const fmtSig = v => { if (!Number.isFinite(v)) return "—"; const a = Math.abs(v); return v.toLocaleString(LOC(), { maximumSignificantDigits: a >= 1000 ? 7 : 4 }); };
+const fmtP = p => (!Number.isFinite(p) ? "—" : p < 0.0001 ? "< " + fmt(0.0001, 4) : fmt(p, 4));
+const pct = v => fmt(v * 100, 1) + (LANG === "es" ? " %" : "%");
 const uid = () => Math.random().toString(36).slice(2, 9);
 const L = i => S.indexLetter(i);
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const FIXED = ["#5b7fd6", "#c4527a", "#6b9e3a", "#8a63c9", "#d07a4a", "#3a9bb0", "#a8892b", "#7a8794"];
-const palette = () => [css("--accent"), css("--amber"), ...FIXED];
-const alpha = (hex, a) => {
-  const m = String(hex).replace("#", "");
-  const n = parseInt(m.length === 3 ? m.split("").map(c => c + c).join("") : m, 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+const LABEL = "__label";
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const ICON = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const IC = {
+  plus: '<path d="M12 5v14M5 12h14"/>', cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  col: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18.5 10v4M16.5 12h4"/>',
+  sort: '<path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/>', imp: '<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 19h14"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>', copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/>',
+  xls: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8l8 8M16 8l-8 8"/>', pdf: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  share: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
+  clear: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>', save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/>',
+  restore: '<path d="M3 12a9 9 0 103-6.7L3 8"/><path d="M3 3v5h5"/>', sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/>', help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.5-2.5 2-2.5 3.5M12 17h.01"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>', paste: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9z"/>',
+  file: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/>', cam: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  link: '<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>'
 };
 
 /* =========================================================
-   Proyectos, plantillas y almacenamiento
+   Ajustes, tema y paletas
    ========================================================= */
-const defaultChart = () => ({ type: "bar", series: [], x: null, y: null, model: "linear", title: "", xTitle: "", yTitle: "", font: "m", legend: "top", zero: true, showMean: false, showValues: false, bins: null });
-function mk(name, labelName, colDefs, rows, chart = {}, stats = {}) {
-  const cols = colDefs.map(([n, formula, color]) => ({ id: uid(), name: n, formula: formula || null, color: color || null }));
+const SKEY = "graficalo.settings";
+const settings = Object.assign({ theme: "auto", lang: null, tutorialDone: false }, (() => { try { return JSON.parse(localStorage.getItem(SKEY)) || {}; } catch { return {}; } })());
+const saveSettings = () => { try { localStorage.setItem(SKEY, JSON.stringify(settings)); } catch {} };
+function applyTheme() {
+  const r = document.documentElement;
+  if (settings.theme === "light" || settings.theme === "dark") r.setAttribute("data-theme", settings.theme); else r.removeAttribute("data-theme");
+  const meta = $('meta[name="theme-color"]'); if (meta) meta.content = getComputedStyle(r).getPropertyValue("--sheet").trim() === "#ffffff" ? "#0e6b5c" : "#161e1b";
+}
+const LIGHT = { "--paper": "#f4f7f5", "--sheet": "#ffffff", "--grid": "#e1e9e5", "--ink": "#17231f", "--muted": "#5b6b65", "--accent": "#0e6b5c", "--accent-soft": "#d6ece6", "--amber": "#c47a12", "--line": "#cfdad5" };
+const DARK = { "--paper": "#0f1513", "--sheet": "#161e1b", "--grid": "#1d2824", "--ink": "#e3ece8", "--muted": "#93a59e", "--accent": "#4cc3aa", "--accent-soft": "#183a33", "--amber": "#e8a646", "--line": "#2a3833" };
+let THEME_OVERRIDE = null;
+const css = n => (THEME_OVERRIDE && THEME_OVERRIDE[n]) || getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const PALETTES = {
+  default: { name: "Gráficalo", colors: () => [css("--accent"), css("--amber"), "#5b7fd6", "#c4527a", "#6b9e3a", "#8a63c9", "#d07a4a", "#3a9bb0", "#a8892b", "#7a8794"] },
+  pastel: { name: "Pastel", colors: () => ["#7fb8d6", "#f2a490", "#9fcf7d", "#c3a6d6", "#f2c96b", "#8fb0f0", "#e8a06b", "#7fd0e0"] },
+  contrast: { name: "Alto contraste", colors: () => ["#0057b8", "#e66100", "#1a9850", "#d01c8b", "#6a3fb5", "#b8860b", "#00838f", "#c62828"] },
+  cb: { name: "Apta para daltónicos", colors: () => ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#D55E00", "#F0E442", "#8c8c8c"] },
+  gray: { name: "Escala de grises (imprimir)", colors: () => [css("--ink"), "#8a8a8a", "#bdbdbd", "#5e5e5e", "#a3a3a3", "#d4d4d4"] }
+};
+const palette = () => (PALETTES[cur()?.palette] || PALETTES.default).colors();
+const alpha = (hex, a) => { const m = toHex(hex).replace("#", ""); const n = parseInt(m, 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
+function toHex(color) {
+  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
+  if (/^#[0-9a-f]{3}$/i.test(color)) return "#" + color.slice(1).split("").map(x => x + x).join("");
+  const c = document.createElement("canvas").getContext("2d"); c.fillStyle = color || "#000"; return c.fillStyle.startsWith("#") ? c.fillStyle : "#0e6b5c";
+}
+
+/* =========================================================
+   Fechas
+   ========================================================= */
+const pad2 = n => String(n).padStart(2, "0");
+const isoOf = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const todayISO = () => isoOf(new Date());
+function parseDate(v) { // devuelve "YYYY-MM-DD" o ""
+  if (v instanceof Date && !isNaN(v)) return isoOf(v);
+  if (typeof v === "number" && v > 20000 && v < 80000) { const d = new Date(Math.round((v - 25569) * 864e5)); return isoOf(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); }
+  const s = String(v ?? "").trim(); if (!s) return "";
+  let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (m) return valid(+m[1], +m[2], +m[3]);
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+  if (m) { let y = +m[3]; if (y < 100) y += 2000; const [a, b] = LANG === "en" ? [+m[2], +m[1]] : [+m[1], +m[2]]; return valid(y, b, a) || valid(y, a, b); }
+  if (/^\d{5}$/.test(s)) return parseDate(+s);
+  return "";
+  function valid(y, mo, d) { const dt = new Date(y, mo - 1, d); return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d ? isoOf(dt) : ""; }
+}
+const tsOf = iso => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d).getTime(); };
+function fmtDate(iso, withYear) {
+  if (!iso) return "";
+  const d = new Date(tsOf(iso));
+  return d.toLocaleDateString(LOC(), withYear ? { day: "numeric", month: "short", year: "2-digit" } : { day: "numeric", month: "short" });
+}
+
+/* =========================================================
+   Proyectos y plantillas
+   ========================================================= */
+const defaultChart = () => ({
+  id: uid(), name: "", type: "bar", series: [], one: null, x: null, y: null, model: "linear",
+  title: "", xTitle: "", yTitle: "", font: "m", legend: "top", zero: true, showMean: false, showValues: false, bins: null,
+  lineIds: [], countCol: LABEL, splitCol: "", countStyle: "bar", countPct: false,
+  lines: [], markMax: false, markMin: false, notes: []
+});
+// colDefs: [nombre, fórmula, tipo] · charts: configuraciones con índices de columna
+function mk(name, labelName, colDefs, rows, charts = [{}], stats = {}, extra = {}) {
+  const cols = colDefs.map(([n, formula, kind]) => ({ id: uid(), name: n, kind: kind || (formula ? "formula" : "num"), formula: formula || null, color: null }));
+  const id = i => (i === "label" ? LABEL : cols[i] ? cols[i].id : null);
   const p = {
-    id: uid(), name, labelName, cols,
-    rows: rows.map(r => { const c = {}; cols.forEach((col, i) => { if (!col.formula && r[i + 1] !== undefined && r[i + 1] !== "") c[col.id] = String(r[i + 1]); }); return { l: r[0] ?? "", c }; }),
-    chart: Object.assign(defaultChart(), chart), stats: Object.assign({}, stats)
+    id: uid(), name, labelName, labelType: extra.labelType || "text", cols, palette: "default", filters: [],
+    rows: rows.map(r => { const c = {}; cols.forEach((col, i) => { if (col.kind !== "formula" && r[i + 1] !== undefined && r[i + 1] !== "") c[col.id] = extra.raw || LANG === "es" ? String(r[i + 1]) : String(r[i + 1]).replace(/^(-?\d+),(\d+)$/, "$1.$2"); }); return { l: r[0] ?? "", c }; }),
+    charts: [], activeChart: null, stats: {}
   };
-  const byIdx = i => cols[i] && cols[i].id;
-  p.chart.series = (chart.series || [0]).map(byIdx).filter(Boolean);
-  p.chart.one = byIdx(chart.one ?? (chart.series || [0])[0]);
-  p.chart.x = byIdx(chart.x ?? 0); p.chart.y = byIdx(chart.y ?? 1) || byIdx(0);
+  const numIdx = cols.map((c, i) => (c.kind !== "text" ? i : -1)).filter(i => i >= 0);
+  charts.forEach((cfg, k) => {
+    const ch = Object.assign(defaultChart(), cfg);
+    ch.name = cfg.name || t("Gráfico {n}", { n: k + 1 });
+    ch.series = (cfg.series || numIdx.slice(0, 1)).map(id).filter(Boolean);
+    ch.one = id(cfg.one ?? (cfg.series || numIdx)[0] ?? 0);
+    ch.x = id(cfg.x ?? numIdx[0] ?? 0); ch.y = id(cfg.y ?? numIdx[1] ?? numIdx[0] ?? 0);
+    ch.lineIds = (cfg.lineIds || []).map(id).filter(Boolean);
+    ch.countCol = cfg.countCol !== undefined ? id(cfg.countCol) : LABEL; ch.splitCol = cfg.splitCol !== undefined ? id(cfg.splitCol) : "";
+    ch.notes = (cfg.notes || []).map(n => ({ label: n.label, text: n.text }));
+    p.charts.push(ch);
+  });
+  p.activeChart = p.charts[0].id;
+  Object.entries(stats).forEach(([k, v]) => (p.stats[k] = typeof v === "number" ? id(v) : v === "label" ? LABEL : v));
   return p;
 }
+function lastDays(n) { const out = []; for (let i = n - 1; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); out.push(isoOf(d)); } return out; }
 const TEMPLATES = [
-  { key: "blank", name: "En blanco", desc: "Una columna vacía para empezar de cero.",
-    make: () => mk("Proyecto nuevo", "Etiqueta", [["Valor"]], [["", ""], ["", ""], ["", ""], ["", ""], ["", ""]]) },
-  { key: "notas", name: "Notas de clase", desc: "Tres evaluaciones y la media de cada alumno.",
-    make: () => mk("Notas de clase", "Alumno", [["1ª evaluación"], ["2ª evaluación"], ["3ª evaluación"], ["Media", "redondear((A+B+C)/3; 2)"]],
+  { key: "blank", name: () => t("En blanco"), desc: () => t("Una columna vacía para empezar de cero."),
+    make: () => mk(t("Proyecto nuevo"), t("Etiqueta"), [[t("Valor")]], [["", ""], ["", ""], ["", ""], ["", ""], ["", ""]]) },
+  { key: "notas", name: () => t("Notas de clase"), desc: () => t("Tres evaluaciones, la media y la línea de aprobado."),
+    make: () => mk(t("Notas de clase"), t("Alumno"), [[t("1ª evaluación")], [t("2ª evaluación")], [t("3ª evaluación")], [t("Media"), `${t("redondear")}((A+B+C)/3; 2)`]],
       [["Ana", "6,5", "7,2", "7,8"], ["Bruno", "8", "8,4", "9"], ["Carla", "4,5", "5,8", "6,2"], ["David", "7", "6,9", "7,4"], ["Elena", "9,2", "9,5", "9,1"], ["Fran", "5,5", "6,1", "5,9"], ["Gema", "6", "7,4", "8"], ["Hugo", "3,8", "5", "5,6"]],
-      { type: "bar", series: [0, 1, 2], showMean: false }, { sumCol: 3, freqCol: 3, regX: 0, regY: 2 }) },
-  { key: "gastos", name: "Gastos del mes", desc: "Categorías, euros y porcentaje de cada una.",
-    make: () => mk("Gastos del mes", "Categoría", [["Euros"], ["% del total", "redondear(A/suma(A)*100; 1)"]],
-      [["Alquiler", "550"], ["Comida", "240"], ["Transporte", "60"], ["Ocio", "95"], ["Facturas", "110"], ["Otros", "45"]],
-      { type: "doughnut", series: [0], showValues: true, legend: "bottom" }) },
-  { key: "deporte", name: "Entrenamiento", desc: "Kilómetros, minutos y ritmo calculado.",
-    make: () => mk("Entrenamiento", "Día", [["Km"], ["Minutos"], ["Ritmo (min/km)", "redondear(B/A; 2)"]],
-      [["Lun", "5", "28"], ["Mar", "", ""], ["Mié", "7,5", "41"], ["Jue", "4", "21"], ["Vie", "", ""], ["Sáb", "12", "70"], ["Dom", "6", "33"]],
-      { type: "bar", series: [0], showValues: true }) },
-  { key: "ventas", name: "Ventas por mes", desc: "Ventas, gastos y beneficio mes a mes.",
-    make: () => mk("Ventas por mes", "Mes", [["Ventas"], ["Gastos"], ["Beneficio", "A-B"]],
-      [["Ene", "1200", "800"], ["Feb", "1350", "820"], ["Mar", "1280", "900"], ["Abr", "1600", "950"], ["May", "1750", "1010"], ["Jun", "1900", "1100"]],
-      { type: "line", series: [0, 1, 2] }, { regX: 0, regY: 2 }) },
-  { key: "relacion", name: "Relación entre dos variables", desc: "Dos columnas para ver si están relacionadas.",
-    make: () => mk("Horas de estudio y nota", "Alumno", [["Horas de estudio"], ["Nota"]],
+      [{ name: t("Por alumno"), type: "bar", series: [0, 1, 2], lines: [{ value: 5, label: t("Aprobado"), color: "" }] }, { name: t("Distribución"), type: "box", series: [0, 1, 2] }],
+      { sumCol: 3, freqCol: 3, regX: 0, regY: 2, testA: 0, testB: 2, testKind: "paired" }) },
+  { key: "gastos", name: () => t("Gastos del mes"), desc: () => t("Categorías, euros y porcentaje de cada una."),
+    make: () => mk(t("Gastos del mes"), t("Categoría"), [[t("Euros")], [t("% del total"), `${t("redondear")}(A/${t("suma")}(A)*100; 1)`]],
+      [[t("Alquiler"), "550"], [t("Comida"), "240"], [t("Transporte"), "60"], [t("Ocio"), "95"], [t("Facturas"), "110"], [t("Otros"), "45"]],
+      [{ name: t("Reparto"), type: "doughnut", one: 0, showValues: true, legend: "bottom" }, { name: t("Ranking"), type: "barh", series: [0], showValues: true, markMax: true }]) },
+  { key: "diario", name: () => t("Registro diario"), desc: () => t("Una fila por día: peso, sueño o lo que quieras seguir."),
+    make: () => { const ds = lastDays(10), w = ["72,4", "72,1", "72,3", "71,8", "71,9", "71,5", "71,6", "71,2", "71,4", "70,9"], h = ["7", "6,5", "8", "7,5", "6", "7", "8,5", "7", "6,5", "7,5"];
+      return mk(t("Registro diario"), t("Fecha"), [[t("Peso (kg)")], [t("Horas de sueño")]], ds.map((d, i) => [d, w[i], h[i]]),
+        [{ name: t("Peso"), type: "line", series: [0], zero: false, markMin: true, showMean: true }, { name: t("Sueño"), type: "bar", series: [1], lines: [{ value: 8, label: t("Objetivo"), color: "" }] }],
+        { sumCol: 0, regX: 1, regY: 0 }, { labelType: "date" }); } },
+  { key: "deporte", name: () => t("Entrenamiento"), desc: () => t("Kilómetros, minutos y ritmo, con doble eje."),
+    make: () => mk(t("Entrenamiento"), t("Día"), [[t("Km")], [t("Minutos")], [t("Ritmo (min/km)"), `${t("redondear")}(B/A; 2)`]],
+      [[t("Lunes"), "5", "28"], [t("Martes"), "", ""], [t("Miércoles"), "7,5", "41"], [t("Jueves"), "4", "21"], [t("Viernes"), "", ""], [t("Sábado"), "12", "70"], [t("Domingo"), "6", "33"]],
+      [{ name: t("Km y ritmo"), type: "combo", series: [0, 2], lineIds: [2], showValues: true }]) },
+  { key: "ventas", name: () => t("Ventas por mes"), desc: () => t("Ventas, gastos y beneficio mes a mes."),
+    make: () => mk(t("Ventas por mes"), t("Mes"), [[t("Ventas")], [t("Gastos")], [t("Beneficio"), "A-B"]],
+      [[t("Ene"), "1200", "800"], [t("Feb"), "1350", "820"], [t("Mar"), "1280", "900"], [t("Abr"), "1600", "950"], [t("May"), "1750", "1010"], [t("Jun"), "1900", "1100"]],
+      [{ name: t("Evolución"), type: "line", series: [0, 1, 2] }, { name: t("Ventas y beneficio"), type: "combo", series: [0, 2], lineIds: [2] }], { regX: 0, regY: 2 }) },
+  { key: "relacion", name: () => t("Relación entre dos variables"), desc: () => t("Dos columnas para ver si están relacionadas."),
+    make: () => mk(t("Horas de estudio y nota"), t("Alumno"), [[t("Horas de estudio")], [t("Nota")]],
       [["", "2", "4,1"], ["", "4", "5,3"], ["", "5", "6,2"], ["", "7", "6,8"], ["", "8", "7,9"], ["", "10", "8,2"], ["", "3", "5"], ["", "6", "6,1"], ["", "9", "8,8"], ["", "1", "3,2"]],
-      { type: "scatter", series: [0, 1], x: 0, y: 1 }, { regX: 0, regY: 1 }) }
+      [{ name: t("Dispersión"), type: "scatter", x: 0, y: 1 }], { regX: 0, regY: 1, section: "rel" }) },
+  { key: "encuesta", name: () => t("Encuesta"), desc: () => t("Respuestas de texto que se cuentan solas."),
+    make: () => { const yes = t("Sí"), no = t("No"), sm = t("A veces");
+      const rows = [["Ana", "1º", yes, "15"], ["Luis", "1º", sm, "16"], ["Marta", "2º", yes, "16"], ["Pablo", "2º", no, "17"], ["Sara", "1º", yes, "15"], ["Iván", "2º", sm, "17"], ["Noa", "1º", yes, "15"], ["Leo", "2º", no, "16"], ["Vera", "1º", sm, "16"], ["Hugo", "2º", yes, "17"], ["Lola", "1º", yes, "15"], ["Dani", "2º", no, "18"]];
+      return mk(t("Encuesta"), t("Persona"), [[t("Curso"), null, "text"], [t("¿Te gusta la app?"), null, "text"], [t("Edad")]], rows,
+        [{ name: t("Respuestas"), type: "count", countCol: 1, countStyle: "doughnut", countPct: true, legend: "bottom" }, { name: t("Por curso"), type: "count", countCol: 0, splitCol: 1, countStyle: "stacked" }],
+        { sumCol: 1, freqCol: 1, crossRow: 0, crossCol: 1, testKind: "groups", testA: 2, testG: 0, section: "cross" }); } }
 ];
-const samples = () => ["notas", "gastos", "relacion", "ventas"].map(k => { const p = TEMPLATES.find(t => t.key === k).make(); p.name += " (ejemplo)"; return p; });
+const samples = () => ["notas", "gastos", "diario", "encuesta", "relacion"].map(k => { const p = TEMPLATES.find(x => x.key === k).make(); p.name += " " + t("(ejemplo)"); return p; });
 
-const KEY = "graficalo.v2", OLDKEY = "graficalo.v1";
-const store = {
-  load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-  save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} }
-};
+/* migraciones */
+function upgradeV2(p) {
+  p.cols.forEach(c => { c.kind = c.kind || (c.formula ? "formula" : "num"); });
+  p.labelType = p.labelType || "text"; p.filters = p.filters || []; p.palette = p.palette || "default"; p.stats = p.stats || {};
+  if (!p.charts) {
+    const ch = Object.assign(defaultChart(), p.chart || {}); ch.id = uid(); ch.name = t("Gráfico {n}", { n: 1 });
+    ch.lines = ch.lines || []; ch.notes = ch.notes || []; ch.lineIds = ch.lineIds || [];
+    p.charts = [ch]; p.activeChart = ch.id; delete p.chart;
+  }
+  return p;
+}
 function migrateV1(old) {
   return old.projects.map(o => {
     const hasB = (o.nameB || "").trim() || o.rows.some(r => String(r[2] ?? "").trim());
     const defs = [[o.nameA || "A"]]; if (hasB) defs.push([o.nameB || "B"]);
-    const typeMap = { hist: "hist", pie: "pie", scatter: "scatter", line: "line", bar: "bar" };
-    return mk(o.name, "Etiqueta", defs, o.rows.map(r => [r[0], r[1], r[2]]),
-      { type: typeMap[o.type] || "bar", series: hasB ? [0, 1] : [0], showMean: !!o.showMean, showValues: !!o.showValues, bins: o.bins || null });
+    return mk(o.name, t("Etiqueta"), defs, o.rows.map(r => [r[0], r[1], r[2]]),
+      [{ type: o.type || "bar", series: hasB ? [0, 1] : [0], showMean: !!o.showMean, showValues: !!o.showValues, bins: o.bins || null }]);
   });
 }
-let state = store.load(KEY);
-if (!state || !Array.isArray(state.projects) || !state.projects.length) {
-  const old = store.load(OLDKEY);
-  state = { projects: old && Array.isArray(old.projects) && old.projects.length ? migrateV1(old) : samples(), current: null };
+function upgradeProject(p) { p = upgradeV2(p); p.charts.forEach(c => { Object.keys(defaultChart()).forEach(k => { if (c[k] === undefined) c[k] = defaultChart()[k]; }); }); return p; }
+
+const KEY = "graficalo.v3";
+const load = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+let state;
+function initState() {
+  state = load(KEY);
+  if (!state || !Array.isArray(state.projects) || !state.projects.length) {
+    const v2 = load("graficalo.v2"), v1 = load("graficalo.v1");
+    if (v2 && Array.isArray(v2.projects) && v2.projects.length) state = { projects: v2.projects.map(upgradeProject), current: v2.current };
+    else if (v1 && Array.isArray(v1.projects) && v1.projects.length) state = { projects: migrateV1(v1), current: null };
+    else state = { projects: samples(), current: null };
+  } else state.projects = state.projects.map(upgradeProject);
+  if (!state.projects.find(p => p.id === state.current)) state.current = state.projects[0].id;
 }
-if (!state.projects.find(p => p.id === state.current)) state.current = state.projects[0].id;
 const cur = () => state.projects.find(p => p.id === state.current);
-let saveT; const persist = () => { clearTimeout(saveT); saveT = setTimeout(() => store.save(state), 250); };
+const saveNow = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { toast(t("No se han podido guardar los cambios: el almacenamiento está lleno.")); } };
+const saveSoon = debounce(saveNow, 250);
+function persist() { saveSoon(); trackSoon(); }
 
 /* =========================================================
-   Datos calculados (con caché)
+   Deshacer y rehacer
+   ========================================================= */
+const HIST = {};
+const snapFields = ["name", "labelName", "labelType", "cols", "rows", "charts", "filters", "palette"];
+const snap = p => JSON.stringify(snapFields.map(k => p[k]));
+const hist = () => (HIST[state.current] = HIST[state.current] || { past: [], future: [], last: snap(cur()) });
+function track() {
+  const h = hist(), s = snap(cur());
+  if (s === h.last) return;
+  h.past.push(h.last); if (h.past.length > 80) h.past.shift();
+  h.future = []; h.last = s; updateUndo();
+}
+const trackSoon = debounce(track, 450);
+function restoreSnap(s) { const p = cur(), v = JSON.parse(s); snapFields.forEach((k, i) => (p[k] = v[i])); }
+function undo() {
+  track(); const h = hist(); if (!h.past.length) return;
+  h.future.push(h.last); h.last = h.past.pop(); restoreSnap(h.last); afterHistory(t("Deshecho"));
+}
+function redo() {
+  track(); const h = hist(); if (!h.future.length) return;
+  h.past.push(h.last); h.last = h.future.pop(); restoreSnap(h.last); afterHistory(t("Rehecho"));
+}
+function afterHistory(msg) { dirty(); saveNow(); renderProjects(); renderTable(); refresh(); updateUndo(); toast(msg); }
+function updateUndo() { const h = HIST[state.current]; $("#undoBtn").disabled = !h || !h.past.length; $("#redoBtn").disabled = !h || !h.future.length; }
+
+/* =========================================================
+   Datos calculados (caché)
    ========================================================= */
 let cache = null;
 const dirty = () => { cache = null; };
+const colById = id => cur().cols.find(c => c.id === id);
+const isNum = c => c && c.kind !== "text";
+const numCols = () => cur().cols.filter(isNum);
+function colName(c) { if (c === LABEL) return cur().labelName || t("Etiqueta"); return c ? c.name || L(cur().cols.indexOf(c)) : "—"; }
+const nameOf = id => (id === LABEL ? colName(LABEL) : colName(colById(id)));
+function colColor(c) { const p = cur(), i = p.cols.indexOf(c), pal = palette(); return (c && c.color) || pal[Math.max(0, i) % pal.length]; }
+function validId(id, fallbackIdx = 0, onlyNum = true) {
+  const list = onlyNum ? numCols() : cur().cols;
+  return list.some(c => c.id === id) ? id : (list[fallbackIdx] || list[0] || {}).id;
+}
+function labelText(p, i) {
+  const l = String(p.rows[i].l ?? "").trim();
+  if (p.labelType === "date") return l ? fmtDate(l, data.multiYear) : `#${i + 1}`;
+  return l || `#${i + 1}`;
+}
 function data() {
-  if (cache && cache.p === cur()) return cache;
   const p = cur();
+  if (cache && cache.p === p) return cache;
   const raw = p.rows.map(r => p.cols.map(c => r.c[c.id] ?? ""));
-  const { values, errors } = S.computeTable(p.cols, raw);
-  const byId = {}, errById = {};
-  p.cols.forEach((c, j) => { byId[c.id] = values[j]; errById[c.id] = errors[j]; });
-  const dataCols = p.cols.filter(c => !c.formula).length ? p.cols.filter(c => !c.formula) : p.cols;
-  const rowIdx = p.rows.map((_, i) => i).filter(i => dataCols.some(c => Number.isFinite(byId[c.id][i])));
-  const labels = rowIdx.map(i => String(p.rows[i].l || "").trim() || `#${i + 1}`);
+  const { values, errors } = S.computeTable(p.cols.map(c => ({ formula: c.kind === "formula" ? c.formula : null })), raw);
+  const byId = {}, errById = {}, txt = {};
+  p.cols.forEach((c, j) => { byId[c.id] = values[j]; errById[c.id] = errors[j]; if (c.kind === "text") txt[c.id] = p.rows.map(r => String(r.c[c.id] ?? "").trim()); });
+  const inputs = p.cols.filter(c => c.kind !== "formula"), base = inputs.length ? inputs : p.cols;
+  const has = i => base.some(c => (c.kind === "text" ? txt[c.id][i] !== "" : Number.isFinite(byId[c.id][i])));
+  const allIdx = p.rows.map((_, i) => i).filter(has);
+  const pass = i => (p.filters || []).every(f => passFilter(p, i, f, byId, txt));
+  const rowIdx = allIdx.filter(pass);
+  if (p.labelType === "date") { const ys = new Set(rowIdx.map(i => String(p.rows[i].l).slice(0, 4)).filter(Boolean)); data.multiYear = ys.size > 1; }
+  const labels = rowIdx.map(i => labelText(p, i));
+  const catOf = (id, i) => {
+    if (id === LABEL) return p.labelType === "date" ? String(p.rows[i].l || "") : String(p.rows[i].l ?? "").trim();
+    const c = colById(id); if (!c) return "";
+    if (c.kind === "text") return txt[id][i];
+    const v = byId[id][i]; return Number.isFinite(v) ? fmt(v, 4) : "";
+  };
   return (cache = {
-    p, byId, errById, rowIdx, labels,
+    p, byId, errById, txt, rowIdx, allIdx, labels, pass,
+    ts: p.labelType === "date" ? rowIdx.map(i => (p.rows[i].l ? tsOf(p.rows[i].l) : NaN)) : null,
     series: id => rowIdx.map(i => (Number.isFinite(byId[id]?.[i]) ? byId[id][i] : null)),
-    vals: id => (byId[id] || []).filter(Number.isFinite)
+    vals: id => rowIdx.map(i => byId[id]?.[i]).filter(Number.isFinite),
+    cat: id => rowIdx.map(i => catOf(id, i)),
+    catDisplay: (id, k) => (id === LABEL && p.labelType === "date" && k ? fmtDate(k, true) : k)
   });
 }
-const colById = id => cur().cols.find(c => c.id === id);
-const colName = c => (c ? c.name || L(cur().cols.indexOf(c)) : "—");
-const colColor = c => { const p = cur(), i = p.cols.indexOf(c); return c.color || palette()[i % palette().length]; };
-function validId(id, fallbackIdx = 0) { const p = cur(); return p.cols.some(c => c.id === id) ? id : (p.cols[fallbackIdx] || p.cols[0] || {}).id; }
+const filtered = () => (cur().filters || []).length > 0;
+
+/* filtros */
+const OPS = { eq: "=", ne: "≠", gt: ">", ge: "≥", lt: "<", le: "≤", has: () => t("contiene"), empty: () => t("está vacío"), full: () => t("no está vacío") };
+const opLabel = o => (typeof OPS[o] === "function" ? OPS[o]() : OPS[o]);
+function passFilter(p, i, f, byId, txt) {
+  let raw, num;
+  if (f.col === LABEL) { raw = String(p.rows[i].l ?? "").trim(); num = p.labelType === "date" ? NaN : S.parseNum(raw); }
+  else { const c = p.cols.find(x => x.id === f.col); if (!c) return true; if (c.kind === "text") { raw = txt[c.id][i]; num = S.parseNum(raw); } else { num = byId[c.id][i]; raw = Number.isFinite(num) ? String(num) : ""; } }
+  if (f.op === "empty") return raw === "";
+  if (f.op === "full") return raw !== "";
+  const val = String(f.val ?? "").trim();
+  if (f.op === "has") return raw.toLowerCase().includes(val.toLowerCase());
+  let a, b;
+  const isDate = f.col === LABEL && p.labelType === "date";
+  if (isDate) { a = raw; b = parseDate(val) || val; }
+  else { const vb = S.parseNum(val); if (Number.isFinite(num) && Number.isFinite(vb)) { a = num; b = vb; } else { a = raw.toLowerCase(); b = val.toLowerCase(); } }
+  if (a === "" && f.op !== "ne") return false;
+  switch (f.op) { case "eq": return a === b; case "ne": return a !== b; case "gt": return a > b; case "ge": return a >= b; case "lt": return a < b; case "le": return a <= b; }
+  return true;
+}
 
 /* =========================================================
-   Proyectos (cabecera)
+   Cabecera: proyectos
    ========================================================= */
 function renderProjects() {
   $("#projectSel").innerHTML = state.projects.map(p => `<option value="${p.id}" ${p.id === state.current ? "selected" : ""}>${esc(p.name)}</option>`).join("");
 }
-$("#projectSel").addEventListener("change", e => { state.current = e.target.value; dirty(); persist(); renderAll(); });
-function addProject(p) { state.projects.push(p); state.current = p.id; dirty(); persist(); renderAll(); }
-
+$("#projectSel").addEventListener("change", e => { track(); state.current = e.target.value; hist(); dirty(); saveNow(); renderAll(); });
+function addProject(p) { track(); state.projects.push(p); state.current = p.id; hist(); dirty(); saveNow(); renderAll(); }
 $("#newProject").addEventListener("click", () => {
-  openSheet(`<h3>Nuevo proyecto</h3><p class="hint">Elige una plantilla. Las que traen datos los tienen de ejemplo: cámbialos por los tuyos.</p>
-    <div class="tpls">${TEMPLATES.map(t => `<button data-act="tpl:${t.key}"><b>${esc(t.name)}</b><small>${esc(t.desc)}</small></button>`).join("")}</div>
-    <div class="actions"><button class="btn ghost" data-act="close">Cancelar</button></div>`,
+  openSheet(`<h3>${t("Nuevo proyecto")}</h3><p class="hint">${t("Elige una plantilla. Las que traen datos los tienen de ejemplo: cámbialos por los tuyos.")}</p>
+    <div class="tpls">${TEMPLATES.map(x => `<button data-act="tpl:${x.key}"><b>${esc(x.name())}</b><small>${esc(x.desc())}</small></button>`).join("")}</div>
+    <div class="actions"><button class="btn ghost" data-act="close">${t("Cancelar")}</button></div>`,
   act => {
-    if (act.startsWith("tpl:")) {
-      const t = TEMPLATES.find(x => x.key === act.slice(4)), p = t.make();
-      if (t.key !== "blank") p.name = t.name;
-      let n = 2, base = p.name; while (state.projects.some(q => q.name === p.name)) p.name = `${base} ${n++}`;
-      addProject(p); closeSheet(); showView("view-data");
-      setTimeout(() => document.querySelector("#tbody input")?.focus(), 60);
-    }
+    if (!act.startsWith("tpl:")) return;
+    const x = TEMPLATES.find(y => y.key === act.slice(4)), p = x.make();
+    let n = 2; const base = p.name; while (state.projects.some(q => q.name === p.name)) p.name = `${base} ${n++}`;
+    addProject(p); closeSheet(); showView("view-data");
+    setTimeout(() => $("#tbody input")?.focus(), 80);
   });
 });
+$("#undoBtn").addEventListener("click", undo);
+$("#redoBtn").addEventListener("click", redo);
+document.addEventListener("keydown", e => {
+  if (!(e.ctrlKey || e.metaKey) || !$("#sheet").hidden) return;
+  const ed = e.target.closest?.("input,textarea,select,[contenteditable]");
+  if (ed) return;
+  const k = e.key.toLowerCase();
+  if (k === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); redo(); }
+});
 
-$("#projectMenu").addEventListener("click", () => {
+/* =========================================================
+   Menú principal
+   ========================================================= */
+$("#menuBtn").addEventListener("click", openMenu);
+function menuItem(act, icon, label, sub, cls = "") { return `<button data-act="${act}" class="${cls}">${ICON(icon)}<span>${label}${sub ? `<small>${sub}</small>` : ""}</span></button>`; }
+function openMenu() {
   const p = cur();
-  openSheet(`<h3>Proyecto</h3>
-    <div class="field"><label class="label" for="renameIn">Nombre</label><input type="text" id="renameIn" value="${esc(p.name)}"></div>
-    <div class="actions" style="justify-content:flex-start">
-      <button class="btn" data-act="dup">Duplicar</button>
-      <button class="btn" data-act="csv">Copiar datos (para Excel)</button>
-      <button class="btn" data-act="clear">Vaciar datos</button>
-      <button class="btn danger" data-act="del">Borrar proyecto</button>
+  openSheet(`<h3>${t("Menú")}</h3>
+    <div class="label">${t("Proyecto")} · ${esc(p.name)}</div>
+    <div class="menulist">
+      ${menuItem("rename", IC.edit, t("Renombrar"))}
+      ${menuItem("dup", IC.copy, t("Duplicar"))}
+      ${menuItem("pdf", IC.pdf, t("Informe en PDF"), t("Gráficos, estadísticas y datos, listo para entregar"))}
+      ${menuItem("xlsx", IC.xls, t("Exportar a Excel"))}
+      ${menuItem("link", IC.link, t("Compartir proyecto"), t("Crea un enlace con los datos dentro"))}
+      ${menuItem("tsv", IC.paste, t("Copiar datos (para pegar en Excel)"))}
+      ${menuItem("clear", IC.clear, t("Vaciar datos"))}
+      ${menuItem("delete", IC.clear, t("Borrar proyecto"), "", "danger")}
     </div>
-    <div id="confirmBox" hidden class="explain"></div>
-    <div class="actions"><button class="btn ghost" data-act="close">Cerrar</button><button class="btn primary" data-act="ok">Guardar nombre</button></div>`,
+    <div class="label">${t("App")}</div>
+    <div class="menulist">
+      ${menuItem("backup", IC.save, t("Guardar copia de seguridad"), t("Todos tus proyectos en un archivo"))}
+      ${menuItem("restore", IC.restore, t("Restaurar copia de seguridad"))}
+      ${menuItem("settings", IC.sun, t("Tema e idioma"))}
+      ${menuItem("tutorial", IC.help, t("Ver el tutorial"))}
+      ${menuItem("about", IC.info, t("Acerca de Gráficalo"))}
+    </div>
+    <div class="actions"><button class="btn ghost" data-act="close">${t("Cerrar")}</button></div>`,
   act => {
-    const box = $("#confirmBox");
-    if (act === "ok") { p.name = $("#renameIn").value.trim() || p.name; persist(); renderProjects(); renderChartTitle(); closeSheet(); }
-    if (act === "dup") { const c = JSON.parse(JSON.stringify(p)); c.id = uid(); c.name = p.name + " (copia)"; addProject(c); closeSheet(); toast("Proyecto duplicado"); }
-    if (act === "csv") copyText(toTSV(p)).then(ok => toast(ok ? "Datos copiados. Pégalos en Excel o Sheets." : "No se pudo copiar"));
-    if (act === "clear") { box.hidden = false; box.innerHTML = `Se borrarán todos los valores de la tabla, pero se mantienen las columnas y sus fórmulas.<div class="actions" style="margin-top:8px"><button class="btn" data-act="cancel">Cancelar</button><button class="btn danger" data-act="clear2">Vaciar</button></div>`; }
-    if (act === "del") { box.hidden = false; box.innerHTML = `¿Borrar «${esc(p.name)}» y todos sus datos? No se puede deshacer.<div class="actions" style="margin-top:8px"><button class="btn" data-act="cancel">Cancelar</button><button class="btn danger" data-act="del2">Sí, borrar</button></div>`; }
-    if (act === "cancel") box.hidden = true;
-    if (act === "clear2") { p.rows = Array.from({ length: 5 }, () => ({ l: "", c: {} })); dirty(); persist(); renderAll(); closeSheet(); toast("Datos vaciados"); }
-    if (act === "del2") {
+    if (act === "rename") renameSheet();
+    if (act === "dup") { const c = JSON.parse(JSON.stringify(p)); c.id = uid(); c.name = p.name + " " + t("(copia)"); addProject(c); closeSheet(); toast(t("Proyecto duplicado")); }
+    if (act === "pdf") pdfSheet();
+    if (act === "xlsx") exportExcel();
+    if (act === "link") shareProjectLink();
+    if (act === "tsv") copyText(toTSV()).then(ok => toast(ok ? t("Datos copiados. Pégalos en Excel o Sheets.") : t("No se pudo copiar")));
+    if (act === "clear") confirmSheet(t("Vaciar datos"), t("Se borrarán todos los valores de la tabla. Las columnas y los gráficos se mantienen. Puedes deshacerlo."), t("Vaciar"), () => {
+      p.rows = Array.from({ length: 5 }, () => ({ l: "", c: {} })); p.filters = []; dirty(); persist(); renderAll(); toast(t("Datos vaciados"));
+    });
+    if (act === "delete") confirmSheet(t("Borrar proyecto"), t("¿Borrar «{name}» y todos sus datos? No se puede deshacer.", { name: p.name }), t("Borrar"), () => {
+      delete HIST[p.id];
       state.projects = state.projects.filter(x => x.id !== p.id);
       if (!state.projects.length) state.projects = samples();
-      state.current = state.projects[0].id; dirty(); persist(); renderAll(); closeSheet(); toast("Proyecto borrado");
-    }
+      state.current = state.projects[0].id; hist(); dirty(); saveNow(); renderAll(); toast(t("Proyecto borrado"));
+    });
+    if (act === "backup") backupSheet();
+    if (act === "restore") $("#backupIn").click();
+    if (act === "settings") settingsSheet();
+    if (act === "tutorial") { closeSheet(); showOnboarding(); }
+    if (act === "about") aboutSheet();
   });
-});
-function toTSV(p) {
-  const d = data();
-  const head = [p.labelName || "Etiqueta", ...p.cols.map(c => c.name)];
-  const rows = p.rows.map((r, i) => [r.l, ...p.cols.map(c => (c.formula ? (Number.isFinite(d.byId[c.id][i]) ? String(d.byId[c.id][i]).replace(".", ",") : "") : r.c[c.id] ?? ""))]);
-  return [head, ...rows].map(r => r.join("\t")).join("\n");
 }
+function renameSheet() {
+  const p = cur();
+  openSheet(`<h3>${t("Renombrar proyecto")}</h3><div class="field"><label class="label" for="renameIn">${t("Nombre")}</label><input type="text" id="renameIn" value="${esc(p.name)}"></div>
+    <div class="actions"><button class="btn ghost" data-act="close">${t("Cancelar")}</button><button class="btn primary" data-act="ok">${t("Guardar")}</button></div>`,
+  act => { if (act === "ok") { p.name = $("#renameIn").value.trim() || p.name; persist(); renderProjects(); renderChartTitle(); renderPanel(); closeSheet(); } });
+  setTimeout(() => $("#renameIn").select(), 60);
+}
+function confirmSheet(title, text, okLabel, fn) {
+  openSheet(`<h3>${esc(title)}</h3><p>${esc(text)}</p><div class="actions"><button class="btn ghost" data-act="close">${t("Cancelar")}</button><button class="btn danger" data-act="ok">${esc(okLabel)}</button></div>`,
+    act => { if (act === "ok") { closeSheet(); fn(); } });
+}
+function settingsSheet() {
+  const seg = (k, opts) => `<div class="seg" role="group">${opts.map(([v, l]) => `<button data-act="${k}:${v}" aria-pressed="${(settings[k] || "auto") === v}">${l}</button>`).join("")}</div>`;
+  openSheet(`<h3>${t("Tema e idioma")}</h3>
+    <div class="setrow"><span>${t("Tema")}</span>${seg("theme", [["auto", t("Automático")], ["light", t("Claro")], ["dark", t("Oscuro")]])}</div>
+    <div class="setrow"><span>${t("Idioma")}</span><div class="seg" role="group"><button data-act="lang:es" aria-pressed="${LANG === "es"}">Español</button><button data-act="lang:en" aria-pressed="${LANG === "en"}">English</button></div></div>
+    <div class="actions"><button class="btn primary" data-act="close">${t("Hecho")}</button></div>`,
+  act => {
+    const [k, v] = act.split(":");
+    if (k === "theme") { settings.theme = v; saveSettings(); applyTheme(); renderTable(); refresh(); settingsSheet(); }
+    if (k === "lang") { settings.lang = v; saveSettings(); setLang(v); settingsSheet(); }
+  });
+}
+function setLang(v) {
+  LANG = v; S.setLocale({ decimalComma: v === "es" }); document.documentElement.lang = v;
+  translateStatic(); dirty(); renderAll();
+}
+function translateStatic() {
+  $$("[data-t]").forEach(el => (el.textContent = t(el.dataset.t)));
+  $$("[data-t-title]").forEach(el => { el.title = t(el.dataset.tTitle); el.setAttribute("aria-label", t(el.dataset.tTitle)); });
+  $$("[data-t-aria]").forEach(el => el.setAttribute("aria-label", t(el.dataset.tAria)));
+  $("#addRow").innerHTML = ICON(IC.plus) + t("Fila");
+  $("#addToday").innerHTML = ICON(IC.cal) + t("Hoy");
+  $("#addCol").innerHTML = ICON(IC.col) + t("Columna");
+  $("#sortBtn").innerHTML = ICON(IC.sort) + t("Ordenar y filtrar");
+  $("#importBtn").innerHTML = ICON(IC.imp) + t("Importar");
+  $("#copyStats").textContent = t("Copiar todo");
+  $("#zoomReset").textContent = t("Restablecer zoom"); $("#fsReset").textContent = t("Restablecer zoom");
+  $("#fsHint").textContent = t("Pellizca para ampliar y arrastra para moverte.");
+}
+function aboutSheet() {
+  openSheet(`<h3>${t("Acerca de Gráficalo")}</h3>
+    <p>${t("Versión {v}. Gratis, sin anuncios y sin registro. Tus datos se guardan solo en este dispositivo.", { v: APP_VERSION })}</p>
+    <p class="hint">${t("Hecho con software libre: Chart.js, chartjs-plugin-zoom y Hammer.js (MIT), SheetJS (Apache 2.0), jsPDF y jsPDF-AutoTable (MIT) y Tesseract.js (Apache 2.0).")}</p>
+    <p class="hint"><a href="privacidad.html" target="_blank" rel="noopener" style="color:var(--accent)">${t("Política de privacidad")}</a></p>
+    <div class="actions"><button class="btn primary" data-act="close">${t("Cerrar")}</button></div>`, () => {});
+}
+const APP_VERSION = "3.0";
 
 /* =========================================================
    Tabla de datos
    ========================================================= */
 function renderTable() {
-  const p = cur(), d = data();
+  const p = cur(), d = data(), inSet = new Set(d.rowIdx);
+  const lt = p.labelType === "date";
   $("#thead").innerHTML = `<tr><th class="num-col">#</th>
-    <th><div class="labelhead"><div class="l">Etiqueta</div><input type="text" id="labelName" value="${esc(p.labelName)}" aria-label="Nombre de la columna de etiquetas"></div></th>
-    ${p.cols.map((c, j) => `<th><button class="colhead" data-col="${c.id}" title="Editar columna"><span class="l"><i style="background:${colColor(c)}"></i>${L(j)}${c.formula ? " · ƒ" : ""}${d.errById[c.id] ? ' <b class="warn">!</b>' : ""}</span><span class="n">${esc(c.name || L(j))}</span></button></th>`).join("")}
-    <th><button class="addcol" id="addColHead" title="Añadir columna">＋</button></th></tr>`;
-  $("#tbody").innerHTML = p.rows.map((r, i) => `<tr data-i="${i}"><td class="num-col">${i + 1}</td>
-    <td><input type="text" id="c${i}_l" data-k="l" value="${esc(r.l)}" aria-label="Etiqueta fila ${i + 1}"></td>
-    ${p.cols.map(c => c.formula
+    <th><button class="colhead" data-col="${LABEL}" title="${t("Editar columna")}"><span class="l">${lt ? t("Fecha") : t("Etiqueta")}</span><span class="n">${esc(colName(LABEL))}</span></button></th>
+    ${p.cols.map((c, j) => `<th><button class="colhead" data-col="${c.id}" title="${t("Editar columna")}"><span class="l"><i style="background:${c.kind === "text" ? "transparent;border:1px solid var(--muted)" : colColor(c)}"></i>${L(j)}${c.kind === "formula" ? " · ƒ" : c.kind === "text" ? " · Aa" : ""}${d.errById[c.id] && c.kind === "formula" ? ' <b class="warn">!</b>' : ""}</span><span class="n">${esc(c.name || L(j))}</span></button></th>`).join("")}
+    <th><button class="addcol" id="addColHead" title="${t("Añadir columna")}" aria-label="${t("Añadir columna")}">＋</button></th></tr>`;
+  $("#tbody").innerHTML = p.rows.map((r, i) => `<tr data-i="${i}" class="${filtered() && d.allIdx.includes(i) && !inSet.has(i) ? "out" : ""}"><td class="num-col">${i + 1}</td>
+    <td>${lt ? `<input type="date" id="c${i}_l" data-k="l" value="${esc(r.l)}" aria-label="${t("Fecha")} ${i + 1}">` : `<input type="text" id="c${i}_l" data-k="l" value="${esc(r.l)}" aria-label="${t("Etiqueta")} ${i + 1}">`}</td>
+    ${p.cols.map(c => c.kind === "formula"
       ? `<td class="calc${d.errById[c.id] ? " err" : ""}" data-fc="${c.id}" data-r="${i}">${d.errById[c.id] ? "!" : fmtSig(d.byId[c.id][i])}</td>`
-      : `<td><input type="text" inputmode="decimal" class="num" id="c${i}_${c.id}" data-k="${c.id}" value="${esc(r.c[c.id] ?? "")}" aria-label="${esc(c.name)} fila ${i + 1}"></td>`).join("")}
-    <td><button class="del" data-del="${i}" aria-label="Borrar fila ${i + 1}">×</button></td></tr>`).join("");
-  updateCount();
+      : c.kind === "text"
+        ? `<td><input type="text" id="c${i}_${c.id}" data-k="${c.id}" list="dl_${c.id}" value="${esc(r.c[c.id] ?? "")}" aria-label="${esc(c.name)} ${i + 1}"></td>`
+        : `<td><input type="text" inputmode="decimal" class="num" id="c${i}_${c.id}" data-k="${c.id}" value="${esc(r.c[c.id] ?? "")}" aria-label="${esc(c.name)} ${i + 1}"></td>`).join("")}
+    <td><button class="del" data-del="${i}" aria-label="${t("Borrar fila")} ${i + 1}">×</button></td></tr>`).join("");
+  renderDatalists();
+  $("#addToday").hidden = !lt;
+  updateCount(); renderFilterBar();
+}
+function renderDatalists() {
+  const p = cur();
+  $("#dlists").outerHTML = `<div id="dlists">${p.cols.filter(c => c.kind === "text").map(c => {
+    const vals = [...new Set(p.rows.map(r => String(r.c[c.id] ?? "").trim()).filter(Boolean))].slice(0, 50);
+    return `<datalist id="dl_${c.id}">${vals.map(v => `<option value="${esc(v)}">`).join("")}</datalist>`;
+  }).join("")}</div>`;
 }
 function updateCalcCells() {
   const d = data();
-  document.querySelectorAll("#tbody td[data-fc]").forEach(td => {
-    const id = td.dataset.fc, v = d.byId[id]?.[+td.dataset.r];
-    td.textContent = d.errById[id] ? "!" : fmtSig(v);
-  });
+  $$("#tbody td[data-fc]").forEach(td => { const id = td.dataset.fc, v = d.byId[id]?.[+td.dataset.r]; td.textContent = d.errById[id] ? "!" : fmtSig(v); });
+  if (filtered()) { const inSet = new Set(d.rowIdx); $$("#tbody tr").forEach(tr => { const i = +tr.dataset.i; tr.classList.toggle("out", d.allIdx.includes(i) && !inSet.has(i)); }); }
 }
-function updateCount() { const n = data().rowIdx.length; $("#rowCount").textContent = `${n} ${n === 1 ? "fila" : "filas"} con datos`; }
-$("#thead").addEventListener("input", e => { if (e.target.id === "labelName") { cur().labelName = e.target.value; persist(); } });
+function updateCount() {
+  const d = data(), n = d.rowIdx.length;
+  $("#rowCount").textContent = filtered() ? t("{n} de {m} filas", { n, m: d.allIdx.length }) : n === 1 ? t("1 fila con datos") : t("{n} filas con datos", { n });
+  ["#chartFiltered", "#statsFiltered", "#panelFiltered"].forEach(s => { const el = $(s); el.hidden = !filtered(); el.textContent = t("Filtrado: {n} de {m}", { n, m: d.allIdx.length }); });
+}
+function renderFilterBar() {
+  const p = cur(), bar = $("#filterBar");
+  if (!filtered()) { bar.hidden = true; return; }
+  bar.hidden = false;
+  bar.innerHTML = `<span>${ICON(IC.sort).replace("<svg", '<svg width="16" height="16" style="vertical-align:-3px"')} <b>${t("Filtro activo")}</b>: ${p.filters.map(f => `${esc(nameOf(f.col))} ${esc(opLabel(f.op))} ${f.op === "empty" || f.op === "full" ? "" : esc(f.val)}`).join(" · ")}</span>
+    <span class="grp"><button class="btn small" data-fb="edit">${t("Editar")}</button><button class="btn small" data-fb="clear">${t("Quitar")}</button></span>`;
+}
+$("#filterBar").addEventListener("click", e => {
+  const b = e.target.closest("[data-fb]"); if (!b) return;
+  if (b.dataset.fb === "edit") sortFilterSheet();
+  else { cur().filters = []; dirty(); persist(); renderTable(); refresh(); toast(t("Filtro quitado")); }
+});
 $("#thead").addEventListener("click", e => {
-  const b = e.target.closest("[data-col]"); if (b) return openColumn(b.dataset.col);
+  const b = e.target.closest("[data-col]"); if (b) return b.dataset.col === LABEL ? openLabelColumn() : openColumn(b.dataset.col);
   if (e.target.closest("#addColHead")) addColumn();
 });
+const refreshSoon = debounce(() => refresh(), 220);
 $("#tbody").addEventListener("input", e => {
   const tr = e.target.closest("tr"); if (!tr) return;
   const r = cur().rows[+tr.dataset.i], k = e.target.dataset.k;
   if (k === "l") r.l = e.target.value; else if (e.target.value === "") delete r.c[k]; else r.c[k] = e.target.value;
-  dirty(); persist(); updateCalcCells(); updateCount(); scheduleRefresh();
+  dirty(); persist(); updateCalcCells(); updateCount(); refreshSoon();
 });
+$("#tbody").addEventListener("change", e => { if (e.target.list) renderDatalists(); });
 $("#tbody").addEventListener("keydown", e => {
   if (e.key !== "Enter" || !e.target.dataset.k) return;
   e.preventDefault();
@@ -214,127 +499,212 @@ $("#tbody").addEventListener("click", e => {
   const d = e.target.closest("[data-del]"); if (!d) return;
   cur().rows.splice(+d.dataset.del, 1); if (!cur().rows.length) cur().rows.push({ l: "", c: {} });
   dirty(); persist(); renderTable(); refresh();
+  toast(t("Fila borrada"), t("Deshacer"), undo);
 });
-$("#addRow").addEventListener("click", () => {
-  cur().rows.push({ l: "", c: {} }); dirty(); persist(); renderTable();
+function addRowAndFocus(label = "") {
+  cur().rows.push({ l: label, c: {} }); dirty(); persist(); renderTable();
   const w = $("#tablewrap"); w.scrollTop = w.scrollHeight;
-  document.getElementById(`c${cur().rows.length - 1}_l`)?.focus();
+  const i = cur().rows.length - 1, first = cur().cols.find(c => c.kind !== "formula");
+  document.getElementById(label && first ? `c${i}_${first.id}` : `c${i}_l`)?.focus();
+}
+$("#addRow").addEventListener("click", () => addRowAndFocus(""));
+$("#addToday").addEventListener("click", () => {
+  const p = cur(), today = todayISO(), ex = p.rows.findIndex(r => r.l === today);
+  if (ex >= 0) { const first = p.cols.find(c => c.kind !== "formula"); document.getElementById(`c${ex}_${first ? first.id : "l"}`)?.focus(); toast(t("Ya hay una fila de hoy")); return; }
+  const empty = p.rows.findIndex(r => !r.l && !Object.keys(r.c).length);
+  if (empty >= 0) { p.rows.splice(empty, 1); }
+  addRowAndFocus(today);
 });
 $("#addCol").addEventListener("click", () => addColumn());
 function addColumn() {
-  const p = cur(), c = { id: uid(), name: `Serie ${L(p.cols.length)}`, formula: null, color: null };
+  const p = cur(), c = { id: uid(), name: t("Serie {l}", { l: L(p.cols.length) }), kind: "num", formula: null, color: null };
   p.cols.push(c);
-  if (["bar", "barh", "stacked", "line", "area", "radar", "box"].includes(p.chart.type)) p.chart.series.push(c.id);
+  const ch = activeChart(); if (ch && ["bar", "barh", "stacked", "line", "area", "radar", "box", "combo"].includes(ch.type)) ch.series.push(c.id);
   dirty(); persist(); renderTable(); refresh(); openColumn(c.id, true);
 }
 
 /* reescribe las letras de las fórmulas cuando se mueven o borran columnas */
-function remapFormulas(p, map) { // map: índice antiguo -> índice nuevo (o -1 si se borró)
+function remapFormulas(p, map) {
   p.cols.forEach(c => {
-    if (!c.formula) return;
-    c.formula = c.formula.replace(/\b([A-Z]{1,2})\b(?!\s*\()/g, (m) => {
-      const o = S.letterIndex(m), n = map[o];
-      return n === undefined ? m : n < 0 ? "#" : L(n);
-    });
+    if (c.kind !== "formula" || !c.formula) return;
+    c.formula = c.formula.replace(/\b([A-Z]{1,2})\b(?!\s*\()/g, m => { const o = S.letterIndex(m), n = map[o]; return n === undefined ? m : n < 0 ? "#" : L(n); });
   });
 }
-
 function openColumn(id, isNew = false) {
   const p = cur(), c = colById(id), j = p.cols.indexOf(c);
-  const letters = p.cols.map((_, k) => L(k)).filter((_, k) => k !== j);
-  const a = letters[0] || "A", b = letters[1] || a;
-  const ex = [`${a}+${b}`, `${a}-${b}`, `(${a}+${b})/2`, `${a}/suma(${a})*100`, `redondear(${a}; 1)`, `${a}-media(${a})`, `si(${a}>=5; 1; 0)`];
-  let mode = c.formula ? "f" : "d", autoColor = !c.color;
-  openSheet(`<h3>Columna ${L(j)}</h3>
+  const letters = p.cols.map((_, k) => L(k)).filter((_, k) => k !== j && p.cols[k].kind !== "text");
+  const a = letters[0] || "A", b = letters[1] || a, sep = LANG === "es" ? ";" : ",";
+  const ex = [`${a}+${b}`, `${a}-${b}`, `(${a}+${b})/2`, `${a}/${t("suma")}(${a})*100`, `${t("redondear")}(${a}${sep} 1)`, `${a}-${t("media")}(${a})`, `${t("si")}(${a}>=5${sep} 1${sep} 0)`];
+  let kind = c.kind, autoColor = !c.color;
+  openSheet(`<h3>${t("Columna {l}", { l: L(j) })}</h3>
     <div class="row2">
-      <div class="field"><label class="label" for="colName">Nombre</label><input type="text" id="colName" value="${esc(c.name)}"></div>
-      <div class="field"><label class="label" for="colColor">Color</label><div style="display:flex;gap:8px;align-items:center"><input type="color" id="colColor" value="${toHex(colColor(c))}"><button class="btn small ghost" data-act="autocolor">Automático</button></div></div>
+      <div class="field"><label class="label" for="colName">${t("Nombre")}</label><input type="text" id="colName" value="${esc(c.name)}"></div>
+      <div class="field"><label class="label" for="colColor">${t("Color")}</label><div style="display:flex;gap:8px;align-items:center"><input type="color" id="colColor" value="${toHex(colColor(c))}"><button class="btn small ghost" data-act="autocolor">${t("Automático")}</button></div></div>
     </div>
-    <div class="field"><span class="label">Contenido</span>
-      <div class="seg" role="group"><button data-act="mode:d" aria-pressed="${mode === "d"}">Datos que escribo</button><button data-act="mode:f" aria-pressed="${mode === "f"}">Fórmula</button></div></div>
-    <div id="fBox" ${mode === "d" ? "hidden" : ""} class="field">
-      <label class="label" for="colFormula">Fórmula (usa las letras de las columnas)</label>
+    <div class="field"><span class="label">${t("Contenido")}</span>
+      <div class="seg" role="group" id="kindSeg"><button data-act="kind:num" aria-pressed="${kind === "num"}">${t("Números")}</button><button data-act="kind:text" aria-pressed="${kind === "text"}">${t("Texto")}</button><button data-act="kind:formula" aria-pressed="${kind === "formula"}">${t("Fórmula")}</button></div>
+      <p class="hint" id="kindHint"></p></div>
+    <div id="fBox" ${kind !== "formula" ? "hidden" : ""} class="field">
+      <label class="label" for="colFormula">${t("Fórmula (usa las letras de las columnas)")}</label>
       <input type="text" id="colFormula" value="${esc(c.formula || "")}" placeholder="${esc(ex[2])}" autocomplete="off" autocapitalize="characters" spellcheck="false" style="font-family:var(--mono)">
       <p id="fMsg" class="hint"></p>
       <div class="examples">${ex.map(x => `<button data-act="ex:${esc(x)}">${esc(x)}</button>`).join("")}</div>
-      <details class="help"><summary>¿Qué puedo escribir?</summary><ul>
-        <li>Letras de columna: <code>A</code>, <code>B</code>… y números (<code>2,5</code> o <code>2.5</code>)</li>
-        <li>Operaciones: <code>+ - * / ^</code> y paréntesis</li>
-        <li>Por fila: <code>redondear(x; n)</code>, <code>raiz(x)</code>, <code>abs(x)</code>, <code>ln(x)</code>, <code>log(x)</code>, <code>exp(x)</code>, <code>pot(x; n)</code>, <code>min(…)</code>, <code>max(…)</code>, <code>si(condición; sí; no)</code></li>
-        <li>De toda la columna: <code>suma(A)</code>, <code>media(A)</code>, <code>mediana(A)</code>, <code>desv(A)</code>, <code>contar(A)</code>, <code>min(A)</code>, <code>max(A)</code></li>
-        <li>Separa los argumentos con <code>;</code></li></ul></details>
+      <details class="help"><summary>${t("¿Qué puedo escribir?")}</summary><ul>
+        <li>${t("Letras de columna: {a} y números", { a: "<code>A</code>, <code>B</code>…" })}</li>
+        <li>${t("Operaciones:")} <code>+ - * / ^</code> ${t("y paréntesis")}</li>
+        <li>${t("Por fila:")} <code>${t("redondear")}(x${sep} n)</code>, <code>${t("raiz")}(x)</code>, <code>abs(x)</code>, <code>ln(x)</code>, <code>log(x)</code>, <code>exp(x)</code>, <code>${t("pot")}(x${sep} n)</code>, <code>min(…)</code>, <code>max(…)</code>, <code>${t("si")}(${t("condición")}${sep} ${t("sí")}${sep} no)</code></li>
+        <li>${t("De toda la columna:")} <code>${t("suma")}(A)</code>, <code>${t("media")}(A)</code>, <code>${t("mediana")}(A)</code>, <code>${t("desv")}(A)</code>, <code>${t("contar")}(A)</code>, <code>min(A)</code>, <code>max(A)</code></li>
+        <li>${t("Separa los argumentos con {s}", { s: `<code>${sep}</code>` })}</li></ul></details>
     </div>
     <div class="actions" style="justify-content:space-between">
       <div style="display:flex;gap:6px">
-        <button class="btn small" data-act="left" ${j === 0 ? "disabled" : ""} aria-label="Mover a la izquierda">◀</button>
-        <button class="btn small" data-act="right" ${j === p.cols.length - 1 ? "disabled" : ""} aria-label="Mover a la derecha">▶</button>
-        <button class="btn small danger" data-act="del" ${p.cols.length < 2 ? "disabled" : ""}>Borrar</button>
+        <button class="btn small" data-act="left" ${j === 0 ? "disabled" : ""} aria-label="${t("Mover a la izquierda")}">◀</button>
+        <button class="btn small" data-act="right" ${j === p.cols.length - 1 ? "disabled" : ""} aria-label="${t("Mover a la derecha")}">▶</button>
+        <button class="btn small danger" data-act="del" ${p.cols.length < 2 ? "disabled" : ""}>${t("Borrar")}</button>
       </div>
-      <div style="display:flex;gap:6px"><button class="btn ghost" data-act="close">Cancelar</button><button class="btn primary" data-act="save">Guardar</button></div>
-    </div>
-    <div id="delBox" hidden class="explain">Se borrará la columna ${L(j)} y sus datos. Las fórmulas que la usen dejarán de funcionar.
-      <div class="actions" style="margin-top:8px"><button class="btn" data-act="nodel">Cancelar</button><button class="btn danger" data-act="del2">Borrar columna</button></div></div>`,
+      <div style="display:flex;gap:6px"><button class="btn ghost" data-act="close">${t("Cancelar")}</button><button class="btn primary" data-act="save">${t("Guardar")}</button></div>
+    </div>`,
   act => {
-    if (act.startsWith("mode:")) {
-      mode = act.slice(5);
-      document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.act === act));
-      $("#fBox").hidden = mode !== "f"; if (mode === "f") { $("#colFormula").focus(); check(); }
+    if (act.startsWith("kind:")) {
+      kind = act.slice(5);
+      $$("#kindSeg button").forEach(x => x.setAttribute("aria-pressed", x.dataset.act === act));
+      $("#fBox").hidden = kind !== "formula"; kindHint(); if (kind === "formula") { $("#colFormula").focus(); check(); }
     }
     if (act.startsWith("ex:")) { $("#colFormula").value = act.slice(3); check(); }
     if (act === "autocolor") { const prev = c.color; c.color = null; $("#colColor").value = toHex(colColor(c)); c.color = prev; autoColor = true; }
     if (act === "save") {
       c.name = $("#colName").value.trim() || L(j);
       c.color = autoColor ? null : $("#colColor").value;
-      if (mode === "f") {
+      if (kind === "formula") {
         const f = $("#colFormula").value.trim();
-        if (!f) { $("#fMsg").className = "err"; $("#fMsg").textContent = "Escribe una fórmula o elige «Datos que escribo»."; return; }
+        if (!f) { $("#fMsg").className = "err"; $("#fMsg").textContent = t("Escribe una fórmula o elige otro tipo de contenido."); return; }
         c.formula = f;
       } else c.formula = null;
+      c.kind = kind;
+      if (kind === "text") p.charts.forEach(ch => { ch.series = ch.series.filter(s => s !== id); ch.lineIds = ch.lineIds.filter(s => s !== id); });
       dirty(); persist(); renderTable(); refresh(); closeSheet();
     }
     if (act === "left" || act === "right") {
-      const k = act === "left" ? j - 1 : j + 1;
-      const map = {}; p.cols.forEach((_, i) => (map[i] = i)); map[j] = k; map[k] = j;
+      const k = act === "left" ? j - 1 : j + 1, map = {}; p.cols.forEach((_, i) => (map[i] = i)); map[j] = k; map[k] = j;
       [p.cols[j], p.cols[k]] = [p.cols[k], p.cols[j]]; remapFormulas(p, map);
       dirty(); persist(); renderTable(); refresh(); openColumn(id);
     }
-    if (act === "del") $("#delBox").hidden = false;
-    if (act === "nodel") $("#delBox").hidden = true;
-    if (act === "del2") {
+    if (act === "del") confirmSheet(t("Borrar columna"), t("Se borrará la columna {l} y sus datos. Las fórmulas que la usen dejarán de funcionar. Puedes deshacerlo.", { l: L(j) }), t("Borrar columna"), () => {
       const map = {}; p.cols.forEach((_, i) => (map[i] = i < j ? i : i === j ? -1 : i - 1));
       p.cols.splice(j, 1); p.rows.forEach(r => delete r.c[id]); remapFormulas(p, map);
-      p.chart.series = p.chart.series.filter(s => s !== id);
-      dirty(); persist(); renderTable(); refresh(); closeSheet(); toast("Columna borrada");
-    }
+      p.charts.forEach(ch => { ch.series = ch.series.filter(s => s !== id); ch.lineIds = ch.lineIds.filter(s => s !== id); });
+      dirty(); persist(); renderTable(); refresh(); toast(t("Columna borrada"), t("Deshacer"), undo);
+    });
   });
+  const kindHint = () => { $("#kindHint").textContent = kind === "num" ? t("Valores numéricos para gráficos y estadísticas.") : kind === "text" ? t("Categorías o respuestas (Sí / No, curso, color…). Se cuentan en gráficos de recuento y tablas cruzadas.") : t("Se calcula sola a partir de otras columnas."); };
+  kindHint();
   $("#colColor").addEventListener("input", () => { autoColor = false; });
   const check = () => {
     const f = $("#colFormula").value.trim(), msg = $("#fMsg");
-    if (!f) { msg.className = "hint"; msg.textContent = "Ejemplo: " + ex[2]; return; }
+    if (!f) { msg.className = "hint"; msg.textContent = t("Ejemplo: {e}", { e: ex[2] }); return; }
     try {
       const comp = S.compileFormula(f, p.cols.length);
-      if (comp.deps.includes(j)) throw new Error("La fórmula no puede usar su propia columna.");
-      const trial = p.cols.map((k, i) => (i === j ? { formula: f } : k));
-      const raw = p.rows.map(r => p.cols.map(k => r.c[k.id] ?? ""));
-      const res = S.computeTable(trial, raw);
+      if (comp.deps.includes(j)) throw new Error(t("La fórmula no puede usar su propia columna."));
+      const trial = p.cols.map((k, i) => ({ formula: i === j ? f : k.kind === "formula" ? k.formula : null }));
+      const res = S.computeTable(trial, p.rows.map(r => p.cols.map(k => r.c[k.id] ?? "")));
       if (res.errors[j]) throw new Error(res.errors[j]);
-      const vals = res.values[j].filter(Number.isFinite).slice(0, 4).map(fmtSig);
-      msg.className = "ok"; msg.textContent = vals.length ? "✓ " + vals.join(" · ") + (res.values[j].filter(Number.isFinite).length > 4 ? " …" : "") : "✓ Fórmula correcta (aún no hay valores)";
-    } catch (err) { msg.className = "err"; msg.textContent = err.message; }
+      const ok = res.values[j].filter(Number.isFinite);
+      msg.className = "ok"; msg.textContent = ok.length ? "✓ " + ok.slice(0, 4).map(fmtSig).join(" · ") + (ok.length > 4 ? " …" : "") : t("✓ Fórmula correcta (aún no hay valores)");
+    } catch (err) { msg.className = "err"; msg.textContent = tErr(err.message); }
   };
   $("#colFormula").addEventListener("input", check);
-  if (mode === "f") check();
-  if (isNew) setTimeout(() => { $("#colName").select(); }, 60);
+  if (kind === "formula") check();
+  if (isNew) setTimeout(() => $("#colName").select(), 60);
 }
-function toHex(color) {
-  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
-  if (/^#[0-9a-f]{3}$/i.test(color)) return "#" + color.slice(1).split("").map(x => x + x).join("");
-  const c = document.createElement("canvas").getContext("2d"); c.fillStyle = color; return c.fillStyle.startsWith("#") ? c.fillStyle : "#0e6b5c";
+function openLabelColumn() {
+  const p = cur(); let type = p.labelType;
+  const bad = () => p.rows.filter(r => String(r.l ?? "").trim() && !parseDate(r.l)).length;
+  openSheet(`<h3>${t("Columna de etiquetas")}</h3>
+    <div class="field"><label class="label" for="lblName">${t("Nombre")}</label><input type="text" id="lblName" value="${esc(p.labelName)}"></div>
+    <div class="field"><span class="label">${t("Tipo")}</span><div class="seg" role="group" id="lblSeg"><button data-act="t:text" aria-pressed="${type === "text"}">${t("Texto")}</button><button data-act="t:date" aria-pressed="${type === "date"}">${t("Fecha")}</button></div>
+    <p class="hint" id="lblHint"></p></div>
+    <div class="actions"><button class="btn ghost" data-act="close">${t("Cancelar")}</button><button class="btn primary" data-act="save">${t("Guardar")}</button></div>`,
+  act => {
+    if (act.startsWith("t:")) { type = act.slice(2); $$("#lblSeg button").forEach(x => x.setAttribute("aria-pressed", x.dataset.act === act)); hint(); }
+    if (act === "save") {
+      p.labelName = $("#lblName").value.trim() || t("Etiqueta");
+      if (type !== p.labelType) {
+        if (type === "date") p.rows.forEach(r => { r.l = parseDate(r.l); });
+        else p.rows.forEach(r => { if (r.l) r.l = fmtDate(r.l, true); });
+        p.labelType = type;
+      }
+      dirty(); persist(); renderTable(); refresh(); closeSheet();
+    }
+  });
+  const hint = () => {
+    const n = bad();
+    $("#lblHint").innerHTML = type === "date"
+      ? esc(t("Cada fila es un día. Los gráficos de líneas y áreas respetan la distancia entre fechas y aparece el botón «Hoy».")) + (p.labelType !== "date" && n ? ` <b class="warn">${esc(t("{n} etiquetas no son fechas y se quedarán vacías.", { n }))}</b>` : "")
+      : esc(t("Nombres, categorías o lo que quieras."));
+  };
+  hint();
+}
+
+/* ordenar y filtrar */
+$("#sortBtn").addEventListener("click", () => sortFilterSheet());
+function catCols() { return [{ id: LABEL, name: colName(LABEL) }, ...cur().cols.map(c => ({ id: c.id, name: colName(c) }))]; }
+function sortFilterSheet() {
+  const p = cur(); const fs = JSON.parse(JSON.stringify(p.filters || []));
+  const colOpts = sel => catCols().map(c => `<option value="${c.id}" ${c.id === sel ? "selected" : ""}>${esc(c.name)}</option>`).join("");
+  const opOpts = sel => Object.keys(OPS).map(o => `<option value="${o}" ${o === sel ? "selected" : ""}>${esc(opLabel(o))}</option>`).join("");
+  const draw = () => {
+    openSheet(`<h3>${t("Ordenar y filtrar")}</h3>
+      <h4>${t("Ordenar filas")}</h4>
+      <div class="sel-row"><select id="sortCol">${colOpts(LABEL)}</select>
+        <div class="seg" role="group"><button data-act="sort:asc">${t("Ascendente")}</button><button data-act="sort:desc">${t("Descendente")}</button></div></div>
+      <p class="hint">${t("Cambia el orden de la tabla. Puedes deshacerlo.")}</p>
+      <h4>${t("Filtrar")}</h4>
+      <p class="hint">${t("Los gráficos y las estadísticas usan solo las filas que cumplen todas las condiciones.")}</p>
+      <div class="listrows" id="fRows">${fs.map((f, i) => `<div class="listrow" data-i="${i}"><select data-f="col">${colOpts(f.col)}</select><select data-f="op" style="flex:0 0 auto">${opOpts(f.op)}</select><input type="text" data-f="val" value="${esc(f.val ?? "")}" ${f.op === "empty" || f.op === "full" ? "hidden" : ""} placeholder="${t("valor")}"><button class="x" data-act="rm:${i}" aria-label="${t("Quitar")}">×</button></div>`).join("") || `<p class="hint">${t("Sin condiciones.")}</p>`}</div>
+      <div class="actions" style="justify-content:space-between"><button class="btn small" data-act="addf">${ICON(IC.plus)}${t("Añadir condición")}</button>
+        <div class="grp"><button class="btn ghost" data-act="clearf" ${fs.length ? "" : "disabled"}>${t("Quitar filtros")}</button><button class="btn primary" data-act="apply">${t("Aplicar")}</button></div></div>`,
+    act => {
+      if (act.startsWith("sort:")) {
+        const id = $("#sortCol").value, dir = act === "sort:asc" ? 1 : -1, d = data();
+        const key = i => { if (id === LABEL) return String(p.rows[i].l ?? ""); const c = colById(id); return c.kind === "text" ? d.txt[id][i] : d.byId[id][i]; };
+        const idx = p.rows.map((_, i) => i).sort((x, y) => {
+          const a = key(x), b = key(y), ea = a === "" || a === undefined || (typeof a === "number" && !Number.isFinite(a)), eb = b === "" || b === undefined || (typeof b === "number" && !Number.isFinite(b));
+          if (ea || eb) return ea - eb;
+          return (typeof a === "number" && typeof b === "number" ? a - b : S.keyCmp(a, b)) * dir;
+        });
+        p.rows = idx.map(i => p.rows[i]); dirty(); persist(); renderTable(); refresh(); closeSheet(); toast(t("Filas ordenadas"), t("Deshacer"), undo);
+      }
+      if (act === "addf") { read(); fs.push({ col: LABEL, op: "eq", val: "" }); draw(); }
+      if (act.startsWith("rm:")) { read(); fs.splice(+act.slice(3), 1); draw(); }
+      if (act === "clearf") { p.filters = []; dirty(); persist(); renderTable(); refresh(); closeSheet(); toast(t("Filtro quitado")); }
+      if (act === "apply") { read(); p.filters = fs.filter(f => f.op === "empty" || f.op === "full" || String(f.val).trim() !== ""); dirty(); persist(); renderTable(); refresh(); closeSheet(); if (p.filters.length) toast(t("Filtro aplicado: {n} filas", { n: data().rowIdx.length })); }
+    });
+    $$("#fRows [data-f=op]").forEach(s => s.addEventListener("change", () => { s.parentElement.querySelector("[data-f=val]").hidden = s.value === "empty" || s.value === "full"; }));
+  };
+  const read = () => $$("#fRows .listrow").forEach(r => { const f = fs[+r.dataset.i]; f.col = r.querySelector("[data-f=col]").value; f.op = r.querySelector("[data-f=op]").value; f.val = r.querySelector("[data-f=val]").value; });
+  draw();
+}
+function toTSV() {
+  const p = cur(), d = data();
+  const head = [p.labelName || t("Etiqueta"), ...p.cols.map(c => c.name)];
+  const num = v => (Number.isFinite(v) ? String(v).replace(".", LANG === "es" ? "," : ".") : "");
+  const rows = p.rows.map((r, i) => [r.l, ...p.cols.map(c => (c.kind === "formula" ? num(d.byId[c.id][i]) : r.c[c.id] ?? ""))]);
+  return [head, ...rows].map(r => r.join("\t")).join("\n");
 }
 
 /* =========================================================
-   Importar: pegar, CSV y Excel
+   Importar
    ========================================================= */
+$("#importBtn").addEventListener("click", () => {
+  openSheet(`<h3>${t("Importar datos")}</h3>
+    <div class="menulist">
+      ${menuItem("paste", IC.paste, t("Pegar datos"), t("Copiados de Excel, Google Sheets o un CSV"))}
+      ${menuItem("file", IC.file, t("Abrir un archivo"), t("Excel (.xlsx, .xls, .ods) o CSV"))}
+      ${menuItem("photo", IC.cam, t("Foto de una tabla"), t("Lee los números de una foto (beta)"))}
+    </div>
+    <div class="actions"><button class="btn ghost" data-act="close">${t("Cancelar")}</button></div>`,
+  act => { if (act === "paste") pasteSheet(); if (act === "file") $("#fileIn").click(); if (act === "photo") $("#photoIn").click(); });
+});
 function parseText(text) {
   const lines = text.replace(/\r/g, "").split("\n");
   while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
@@ -352,544 +722,189 @@ function parseText(text) {
     out.push(cell); return out.map(x => x.trim());
   });
 }
-function fromMatrix(m) {
-  m = m.map(r => r.map(x => (x === null || x === undefined ? "" : String(x).trim())));
+function fromMatrix(m, forceHeader) {
+  m = m.map(r => r.map(x => (x instanceof Date ? isoOf(x) : x === null || x === undefined ? "" : String(x).trim())));
   m = m.filter(r => r.some(x => x !== ""));
   if (!m.length) return null;
   const width = Math.max(...m.map(r => r.length));
   m = m.map(r => { const c = [...r]; while (c.length < width) c.push(""); return c; });
-  const isNum = x => Number.isFinite(S.parseNum(x));
-  let keep = []; for (let j = 0; j < width; j++) if (m.some(r => r[j] !== "")) keep.push(j);
+  const keep = []; for (let j = 0; j < width; j++) if (m.some(r => r[j] !== "")) keep.push(j);
   m = m.map(r => keep.map(j => r[j]));
-  const w = keep.length;
-  // ¿la primera fila es un encabezado?
-  const header = m.length > 1 && m[0].some((x, j) => x !== "" && !isNum(x) && m.slice(1).some(r => isNum(r[j]))) ? m.shift() : null;
-  // ¿la primera columna son etiquetas?
-  const nonEmpty0 = m.map(r => r[0]).filter(x => x !== "");
-  const labelCol = w > 1 && nonEmpty0.filter(x => !isNum(x)).length >= nonEmpty0.length / 2;
+  const w = keep.length, numeric = x => Number.isFinite(S.parseNum(x)), dateLike = x => /[-/.]/.test(x) && !!parseDate(x);
+  const colIsNum = (rows, j) => { const v = rows.map(r => r[j]).filter(x => x !== ""); return v.length > 0 && v.filter(numeric).length >= v.length / 2; };
+  let header;
+  if (forceHeader !== undefined) header = forceHeader && m.length > 1;
+  else header = m.length > 1 && (m[0].some((x, j) => x !== "" && !numeric(x) && colIsNum(m.slice(1), j)) || (m[0].every(x => x !== "" && !numeric(x)) && new Set(m[0]).size === w && m.slice(1).some(r => r.some(numeric))));
+  const head = header ? m[0] : null, body = header ? m.slice(1) : m;
+  const c0 = body.map(r => r[0]).filter(x => x !== "");
+  const dateCol = c0.length && c0.filter(dateLike).length >= c0.length * 0.8;
+  const labelCol = w > 1 && (dateCol || c0.filter(x => !numeric(x)).length >= c0.length / 2) && !(w > 1 && body.every(r => r[0] === "" || numeric(r[0])) );
   const start = labelCol ? 1 : 0;
   const cols = [];
-  for (let j = start; j < w; j++) {
-    const vals = m.map(r => r[j]).filter(x => x !== "");
-    if (vals.length && vals.filter(isNum).length >= vals.length / 2) cols.push(j);
-  }
-  const skipped = w - start - cols.length;
+  for (let j = start; j < w; j++) cols.push({ j, kind: colIsNum(body, j) ? "num" : "text", name: (head && head[j]) || t("Serie {l}", { l: L(cols.length) }) });
   if (!cols.length) return null;
   return {
-    labelName: labelCol && header ? header[0] || "Etiqueta" : "Etiqueta",
-    colNames: cols.map((j, k) => (header && header[j]) || `Serie ${L(k)}`),
-    rows: m.map(r => [labelCol ? r[0] : "", ...cols.map(j => r[j])]),
-    skipped, preview: [header || null, ...m.slice(0, 6)].filter(Boolean)
+    header: !!header, labelName: labelCol && head ? head[0] || t("Etiqueta") : t("Etiqueta"), labelType: dateCol && labelCol ? "date" : "text",
+    cols, rows: body.map(r => [labelCol ? (dateCol ? parseDate(r[0]) : r[0]) : "", ...cols.map(c => r[c.j])]),
+    preview: [head, ...body.slice(0, 6)].filter(Boolean), hasHeadRow: !!head
   };
 }
-function importFlow(sheets, suggestedName) { // sheets: [{name, matrix}]
-  let idx = 0;
+function importFlow(sheets, suggestedName) {
+  let idx = 0, forced;
   const draw = () => {
-    const t = fromMatrix(sheets[idx].matrix);
-    const prev = t ? `<div class="preview"><table>${t.preview.slice(0, 7).map(r => `<tr>${r.slice(0, 8).map(x => `<td>${esc(x)}</td>`).join("")}</tr>`).join("")}</table></div>
-      <p class="hint">${t.rows.length} filas · ${t.colNames.length} ${t.colNames.length === 1 ? "columna numérica" : "columnas numéricas"}: ${t.colNames.map(esc).join(", ")}${t.skipped ? ` · ${t.skipped} columna(s) de texto ignoradas` : ""}</p>`
-      : `<p class="err">No he encontrado columnas con números en ${sheets.length > 1 ? "esta hoja" : "estos datos"}.</p>`;
-    openSheet(`<h3>Importar datos</h3>
-      ${sheets.length > 1 ? `<div class="field"><label class="label" for="sheetSel">Hoja</label><select id="sheetSel">${sheets.map((s, i) => `<option value="${i}" ${i === idx ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></div>` : ""}
-      ${prev}
-      <div class="actions"><button class="btn ghost" data-act="close">Cancelar</button>
-        ${t ? `<button class="btn" data-act="replace">Reemplazar el proyecto actual</button><button class="btn primary" data-act="new">Crear proyecto nuevo</button>` : ""}</div>`,
+    const tb = fromMatrix(sheets[idx].matrix, forced);
+    const nNum = tb ? tb.cols.filter(c => c.kind === "num").length : 0, nTxt = tb ? tb.cols.length - nNum : 0;
+    openSheet(`<h3>${t("Importar datos")}</h3>
+      ${sheets.length > 1 ? `<div class="field"><label class="label" for="sheetSel">${t("Hoja")}</label><select id="sheetSel">${sheets.map((s, i) => `<option value="${i}" ${i === idx ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></div>` : ""}
+      ${tb ? `<div class="preview"><table>${tb.preview.slice(0, 7).map((r, k) => `<tr class="${k === 0 && tb.hasHeadRow ? "h" : ""}">${r.slice(0, 8).map(x => `<td>${esc(x)}</td>`).join("")}</tr>`).join("")}</table></div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:.9rem"><input type="checkbox" id="hdrChk" ${tb.header ? "checked" : ""}> ${t("La primera fila son los nombres de las columnas")}</label>
+        <p class="hint">${t("{r} filas · {n} columnas de números · {x} de texto", { r: tb.rows.length, n: nNum, x: nTxt })}${tb.labelType === "date" ? " · " + t("fechas detectadas") : ""}</p>`
+      : `<p class="err">${t("No he encontrado datos que se puedan importar.")}</p>`}
+      <div class="actions"><button class="btn ghost" data-act="close">${t("Cancelar")}</button>
+        ${tb ? `<button class="btn" data-act="replace">${t("Reemplazar el proyecto actual")}</button><button class="btn primary" data-act="new">${t("Crear proyecto nuevo")}</button>` : ""}</div>`,
     act => {
-      if (!t) return;
-      const defs = t.colNames.map(n => [n]);
-      const build = () => mk(suggestedName || "Datos importados", t.labelName, defs, t.rows, { type: defs.length > 1 ? "bar" : "bar", series: defs.map((_, i) => i).slice(0, 6), x: 0, y: Math.min(1, defs.length - 1) }, { regX: 0, regY: Math.min(1, defs.length - 1) });
-      if (act === "new") { addProject(build()); closeSheet(); toast(`${t.rows.length} filas importadas`); showView("view-data"); }
+      if (!tb) return;
+      const numIdx = tb.cols.map((c, i) => (c.kind === "num" ? i : -1)).filter(i => i >= 0), txtIdx = tb.cols.map((c, i) => (c.kind === "text" ? i : -1)).filter(i => i >= 0);
+      const chart = numIdx.length ? { type: tb.labelType === "date" ? "line" : "bar", series: numIdx.slice(0, 6), x: numIdx[0], y: numIdx[1] ?? numIdx[0] } : { type: "count", countCol: txtIdx[0], countStyle: "bar" };
+      const build = () => mk(suggestedName || t("Datos importados"), tb.labelName, tb.cols.map(c => [c.name, null, c.kind]), tb.rows, [chart],
+        { regX: numIdx[0] ?? 0, regY: numIdx[1] ?? numIdx[0] ?? 0, sumCol: numIdx[0] ?? txtIdx[0] ?? 0 }, { labelType: tb.labelType, raw: true });
+      if (act === "new") { addProject(build()); closeSheet(); toast(t("{n} filas importadas", { n: tb.rows.length })); showView("view-data"); }
       if (act === "replace") {
         const p = cur(), n = build();
-        Object.assign(p, { labelName: n.labelName, cols: n.cols, rows: n.rows, chart: Object.assign(p.chart, { series: n.chart.series, x: n.chart.x, y: n.chart.y }), stats: {} });
-        dirty(); persist(); renderAll(); closeSheet(); toast(`${t.rows.length} filas importadas`);
+        Object.assign(p, { labelName: n.labelName, labelType: n.labelType, cols: n.cols, rows: n.rows, charts: n.charts, activeChart: n.activeChart, stats: n.stats, filters: [] });
+        dirty(); persist(); renderAll(); closeSheet(); toast(t("{n} filas importadas", { n: tb.rows.length }), t("Deshacer"), undo);
       }
     });
-    $("#sheetSel")?.addEventListener("change", e => { idx = +e.target.value; draw(); });
+    $("#sheetSel")?.addEventListener("change", e => { idx = +e.target.value; forced = undefined; draw(); });
+    $("#hdrChk")?.addEventListener("change", e => { forced = e.target.checked; draw(); });
   };
   draw();
 }
-$("#pasteBtn").addEventListener("click", () => {
-  openSheet(`<h3>Pegar datos</h3>
-    <p class="hint">Copia celdas desde Excel, Google Sheets o un CSV y pégalas aquí. La primera fila puede ser el encabezado y la primera columna las etiquetas.</p>
-    <textarea id="pasteArea" placeholder="Mes	Ventas	Gastos&#10;Enero	1200	800&#10;Febrero	1350	820"></textarea>
-    <div class="actions"><button class="btn ghost" data-act="close">Cancelar</button><button class="btn primary" data-act="ok">Continuar</button></div>`,
+function pasteSheet(prefill = "", note = "") {
+  openSheet(`<h3>${t("Pegar datos")}</h3>
+    <p class="hint">${note || t("Copia celdas desde Excel, Google Sheets o un CSV y pégalas aquí. La primera fila puede ser el encabezado y la primera columna las etiquetas.")}</p>
+    <textarea id="pasteArea" placeholder="${t("Mes")}\t${t("Ventas")}\t${t("Gastos")}&#10;${t("Ene")}\t1200\t800&#10;${t("Feb")}\t1350\t820">${esc(prefill)}</textarea>
+    <div class="actions"><button class="btn ghost" data-act="close">${t("Cancelar")}</button><button class="btn primary" data-act="ok">${t("Continuar")}</button></div>`,
   act => {
     if (act !== "ok") return;
     const m = parseText($("#pasteArea").value);
-    if (!m.length) { toast("Pega primero algunos datos"); return; }
-    importFlow([{ name: "Datos", matrix: m }]);
+    if (!m.length) { toast(t("Pega primero algunos datos")); return; }
+    importFlow([{ name: t("Datos"), matrix: m }]);
   });
   setTimeout(() => $("#pasteArea").focus(), 60);
-});
-let xlsxPromise = null;
-function loadXLSX() {
-  if (window.XLSX) return Promise.resolve(window.XLSX);
-  return (xlsxPromise = xlsxPromise || new Promise((res, rej) => {
-    const s = document.createElement("script"); s.src = "xlsx.full.min.js";
-    s.onload = () => res(window.XLSX); s.onerror = () => { xlsxPromise = null; rej(new Error("No se pudo cargar el lector de Excel. Ábrelo una vez con conexión.")); };
+}
+const scripts = {};
+function loadScript(src) {
+  return (scripts[src] = scripts[src] || new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = src;
+    s.onload = res; s.onerror = () => { delete scripts[src]; rej(new Error(t("No se pudo cargar un componente de la app. Ábrela una vez con conexión a internet."))); };
     document.head.appendChild(s);
   }));
 }
+const loadXLSX = () => (window.XLSX ? Promise.resolve() : loadScript("lib/xlsx.full.min.js"));
 $("#fileIn").addEventListener("change", async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
   const name = f.name.replace(/\.[^.]+$/, "");
   try {
     if (/\.(xlsx|xls|ods)$/i.test(f.name)) {
-      toast("Leyendo el archivo…");
-      const [XLSX, buf] = await Promise.all([loadXLSX(), f.arrayBuffer()]);
-      const wb = XLSX.read(buf, { type: "array" });
+      toast(t("Leyendo el archivo…"));
+      const [, buf] = await Promise.all([loadXLSX(), f.arrayBuffer()]);
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const sheets = wb.SheetNames.map(n => ({ name: n, matrix: XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: "" }) })).filter(s => s.matrix.length);
-      if (!sheets.length) throw new Error("El archivo no tiene datos.");
+      if (!sheets.length) throw new Error(t("El archivo no tiene datos."));
       importFlow(sheets, name);
     } else {
       let text = await f.text();
-      if (text.includes("\uFFFD")) { const buf = await f.arrayBuffer(); text = new TextDecoder("windows-1252").decode(buf); }
-      const m = parseText(text);
-      if (!m.length) throw new Error("El archivo está vacío.");
-      importFlow([{ name: "Datos", matrix: m }], name);
+      if (text.includes("\uFFFD")) text = new TextDecoder("windows-1252").decode(await f.arrayBuffer());
+      const m = parseText(text); if (!m.length) throw new Error(t("El archivo está vacío."));
+      importFlow([{ name: t("Datos"), matrix: m }], name);
     }
-  } catch (err) { toast(err.message || "No se pudo leer el archivo"); }
+  } catch (err) { toast(err.message || t("No se pudo leer el archivo")); }
 });
 
 /* =========================================================
-   Gráficos
-   ========================================================= */
-const ICON = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">${d}</svg>`;
-const TYPES = [
-  { id: "bar", name: "Barras", icon: '<path d="M4 20V11M10 20V5M16 20v-8M21 20H3"/>' },
-  { id: "barh", name: "Horizontal", icon: '<path d="M4 4v16M4 7h9M4 12h14M4 17h6"/>' },
-  { id: "stacked", name: "Apiladas", icon: '<path d="M6 20v-6h4v6M6 14V9h4v5M14 20v-9h4v9M14 11V5h4v6M3 20h18"/>' },
-  { id: "line", name: "Líneas", icon: '<path d="M3 17l5-6 4 3 8-9"/>' },
-  { id: "area", name: "Áreas", icon: '<path d="M3 19l5-7 4 3 8-9v13z"/>' },
-  { id: "pie", name: "Sectores", icon: '<circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 5"/>' },
-  { id: "doughnut", name: "Anillo", icon: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/>' },
-  { id: "radar", name: "Radar", icon: '<path d="M12 3l8 6-3 10H7L4 9z"/><path d="M12 8l4 3-1.5 4h-5L8 11z"/>' },
-  { id: "scatter", name: "Dispersión", icon: '<circle cx="6" cy="16" r="1.6"/><circle cx="11" cy="11" r="1.6"/><circle cx="15" cy="13" r="1.6"/><circle cx="18" cy="6" r="1.6"/>' },
-  { id: "hist", name: "Histograma", icon: '<path d="M3 20h18M5 20v-6h4v6M9 20V8h4v12M13 20v-9h4v9M17 20v-4h3"/>' },
-  { id: "box", name: "Caja", icon: '<path d="M12 3v4M12 17v4M9 3h6M9 21h6"/><rect x="6" y="7" width="12" height="10" rx="1"/><path d="M6 12h12"/>' }
-];
-const SINGLE = ["pie", "doughnut", "hist"];
-$("#types").innerHTML = TYPES.map(t => `<button data-type="${t.id}" aria-pressed="false">${ICON(t.icon)}${t.name}</button>`).join("");
-$("#types").addEventListener("click", e => {
-  const b = e.target.closest("[data-type]"); if (!b) return;
-  const ch = cur().chart; ch.type = b.dataset.type;
-  if (!SINGLE.includes(ch.type) && ch.type !== "scatter" && ch.series.length < 1 && cur().cols[0]) ch.series = [cur().cols[0].id];
-  persist(); renderChart();
-});
-$("#seriesChips").addEventListener("click", e => {
-  const b = e.target.closest("[data-s]"); if (!b) return;
-  const ch = cur().chart, id = b.dataset.s;
-  if (SINGLE.includes(ch.type)) ch.one = id;
-  else ch.series = ch.series.includes(id) ? ch.series.filter(s => s !== id) : cur().cols.map(c => c.id).filter(c => c === id || ch.series.includes(c));
-  persist(); renderChart();
-});
-["chartX", "chartY", "chartModel"].forEach(k => $("#" + k).addEventListener("change", e => {
-  const ch = cur().chart; ch[{ chartX: "x", chartY: "y", chartModel: "model" }[k]] = e.target.value; persist(); renderChart();
-}));
-$("#optMean").addEventListener("change", e => { cur().chart.showMean = e.target.checked; persist(); renderChart(); });
-$("#optValues").addEventListener("change", e => { cur().chart.showValues = e.target.checked; persist(); renderChart(); });
-$("#optBins").addEventListener("input", e => { const v = parseInt(e.target.value, 10); cur().chart.bins = v >= 2 && v <= 40 ? v : null; persist(); scheduleRefresh(); });
-
-const valueLabels = {
-  id: "valueLabels",
-  afterDatasetsDraw(chart, _a, opts) {
-    if (!opts.show) return;
-    const { ctx } = chart, t = opts.kind;
-    ctx.save(); ctx.font = `500 ${opts.size}px ${css("--mono")}`;
-    chart.data.datasets.forEach((ds, di) => {
-      if (ds._noLabels || !chart.isDatasetVisible(di)) return;
-      chart.getDatasetMeta(di).data.forEach((el, i) => {
-        const v = ds.data[i]; if (v == null || typeof v === "object") return;
-        if (t === "pie" || t === "doughnut") {
-          const tot = ds.data.reduce((s, x) => s + (x || 0), 0), pos = el.tooltipPosition();
-          if (v / tot < 0.04) return;
-          ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText(fmt((v / tot) * 100, 0) + " %", pos.x, pos.y + 4);
-        } else if (t === "barh") {
-          ctx.fillStyle = css("--ink"); ctx.textAlign = "left"; ctx.fillText(fmt(v), el.x + 4, el.y + 4);
-        } else if (t === "stacked") {
-          ctx.fillStyle = "#fff"; ctx.textAlign = "center"; if (Math.abs(el.base - el.y) > 14) ctx.fillText(fmt(v), el.x, (el.y + el.base) / 2 + 4);
-        } else { ctx.fillStyle = css("--ink"); ctx.textAlign = "center"; ctx.fillText(fmt(v), el.x, el.y - 6); }
-      });
-    });
-    ctx.restore();
-  }
-};
-const boxPlugin = {
-  id: "boxplot",
-  afterDatasetsDraw(chart, _a, o) {
-    if (!o.stats) return;
-    const ctx = chart.ctx, y = chart.scales.y, meta = chart.getDatasetMeta(0), py = v => y.getPixelForValue(v);
-    ctx.save();
-    meta.data.forEach((el, i) => {
-      const s = o.stats[i]; if (!s) return;
-      const x = el.x, w = el.width;
-      ctx.strokeStyle = o.colors[i]; ctx.fillStyle = o.colors[i];
-      ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x - w / 2, py(s.median)); ctx.lineTo(x + w / 2, py(s.median)); ctx.stroke();
-      ctx.lineWidth = 1.5; ctx.beginPath();
-      ctx.moveTo(x, py(s.q3)); ctx.lineTo(x, py(s.whiskerHigh)); ctx.moveTo(x, py(s.q1)); ctx.lineTo(x, py(s.whiskerLow));
-      ctx.moveTo(x - w / 4, py(s.whiskerHigh)); ctx.lineTo(x + w / 4, py(s.whiskerHigh));
-      ctx.moveTo(x - w / 4, py(s.whiskerLow)); ctx.lineTo(x + w / 4, py(s.whiskerLow)); ctx.stroke();
-      const my = py(s.mean); ctx.beginPath(); ctx.moveTo(x - 4, my - 4); ctx.lineTo(x + 4, my + 4); ctx.moveTo(x + 4, my - 4); ctx.lineTo(x - 4, my + 4); ctx.stroke();
-      s.outliers.forEach(v => { ctx.beginPath(); ctx.arc(x, py(v), 3.5, 0, Math.PI * 2); ctx.stroke(); });
-    });
-    ctx.restore();
-  }
-};
-Chart.register(valueLabels, boxPlugin);
-
-let chart;
-function renderChartTitle() { $("#chartTitle").textContent = cur().name; }
-function fillColSelect(sel, value, fallbackIdx = 0) {
-  const p = cur(); const v = validId(value, fallbackIdx);
-  sel.innerHTML = p.cols.map((c, j) => `<option value="${c.id}" ${c.id === v ? "selected" : ""}>${L(j)} · ${esc(colName(c))}</option>`).join("");
-  return v;
-}
-function fillModelSelect(sel, value) {
-  sel.innerHTML = Object.entries(S.MODELS).map(([k, n]) => `<option value="${k}" ${k === value ? "selected" : ""}>${n}</option>`).join("");
-}
-function renderChartControls() {
-  const p = cur(), ch = p.chart;
-  ch.series = ch.series.filter(id => p.cols.some(c => c.id === id));
-  ch.one = validId(ch.one || ch.series[0], 0);
-  const single = SINGLE.includes(ch.type);
-  document.querySelectorAll("#types [data-type]").forEach(b => b.setAttribute("aria-pressed", b.dataset.type === ch.type));
-  const isXY = ch.type === "scatter";
-  $("#seriesRow").hidden = isXY; $("#xyRow").hidden = !isXY;
-  $("#seriesChips").innerHTML = p.cols.map((c, j) => `<button data-s="${c.id}" aria-pressed="${single ? c.id === ch.one : ch.series.includes(c.id)}"><i style="background:${colColor(c)}"></i>${esc(colName(c))}</button>`).join("");
-  if (isXY) { ch.x = fillColSelect($("#chartX"), ch.x, 0); ch.y = fillColSelect($("#chartY"), ch.y, 1); fillModelSelect($("#chartModel"), ch.model || "linear"); }
-  $("#optMeanW").hidden = !["bar", "line", "area"].includes(ch.type);
-  $("#optValuesW").hidden = !["bar", "barh", "stacked", "line", "area", "pie", "doughnut"].includes(ch.type);
-  $("#binsWrap").hidden = ch.type !== "hist";
-  $("#optMean").checked = !!ch.showMean; $("#optValues").checked = !!ch.showValues; $("#optBins").value = ch.bins || "";
-  renderChartTitle();
-}
-function buildConfig() {
-  const p = cur(), ch = p.chart, d = data();
-  const ink = css("--ink"), muted = css("--muted"), grid = css("--grid"), pal = palette();
-  const fs = { s: 10, m: 12, l: 15 }[ch.font] || 12;
-  Chart.defaults.font.family = css("--body"); Chart.defaults.font.size = fs; Chart.defaults.color = muted;
-  const legend = { display: ch.legend !== "none", position: ch.legend === "bottom" ? "bottom" : "top", labels: { color: ink, boxWidth: 12, font: { size: fs } } };
-  const base = {
-    responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
-    plugins: {
-      legend, tooltip: { callbacks: {} },
-      title: { display: !!ch.title, text: ch.title, color: ink, font: { family: css("--display"), size: fs + 5, weight: "600" }, padding: { bottom: 10 } },
-      valueLabels: { show: !!ch.showValues, kind: ch.type, size: Math.max(9, fs - 1) }, boxplot: {}
-    },
-    scales: {
-      x: { ticks: { color: muted }, grid: { color: grid }, title: { display: !!ch.xTitle, text: ch.xTitle, color: muted } },
-      y: { ticks: { color: muted, font: { family: css("--mono") } }, grid: { color: grid }, beginAtZero: ch.zero !== false, title: { display: !!ch.yTitle, text: ch.yTitle, color: muted } }
-    }
-  };
-  const labels = d.labels;
-  const sel = ch.series.map(colById).filter(Boolean);
-  const need = msg => ({ empty: msg });
-
-  if (["bar", "barh", "stacked", "line", "area"].includes(ch.type)) {
-    if (!sel.length) return need("Elige al menos una serie.");
-    if (!sel.some(c => d.vals(c.id).length)) return need("Las series elegidas no tienen datos todavía.");
-    const kind = ch.type === "area" ? "line" : ch.type === "line" ? "line" : "bar";
-    const ds = sel.map(c => {
-      const col = colColor(c);
-      return { label: colName(c), data: d.series(c.id), borderColor: col, borderWidth: 2,
-        backgroundColor: kind === "bar" ? col : alpha(toHex(col), ch.type === "area" ? 0.22 : 0.1),
-        fill: ch.type === "area" ? "origin" : false, tension: 0.25, pointRadius: 3.5, borderRadius: ch.type === "stacked" ? 0 : 4, spanGaps: true };
-    });
-    if (ch.showMean && ["bar", "line", "area"].includes(ch.type)) sel.forEach(c => {
-      const m = S.mean(d.vals(c.id)); if (!Number.isFinite(m)) return;
-      ds.push({ type: "line", label: `Media ${colName(c)}`, data: labels.map(() => m), borderColor: colColor(c), borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, fill: false, _noLabels: true });
-    });
-    if (ch.type === "barh") { base.indexAxis = "y"; base.scales.x.beginAtZero = ch.zero !== false; base.scales.x.ticks.font = { family: css("--mono") }; delete base.scales.y.ticks.font; }
-    if (ch.type === "stacked") { base.scales.x.stacked = true; base.scales.y.stacked = true; }
-    if (ds.length === 1) legend.display = false;
-    return { type: kind, data: { labels, datasets: ds }, options: base };
-  }
-  if (ch.type === "pie" || ch.type === "doughnut") {
-    const c = colById(ch.one) || p.cols[0]; if (!c) return need("Añade una columna con datos.");
-    const items = d.rowIdx.map((ri, k) => ({ label: labels[k], v: d.byId[c.id][ri] })).filter(o => Number.isFinite(o.v) && o.v > 0);
-    if (!items.length) return need("Para sectores hacen falta valores positivos en la serie elegida.");
-    delete base.scales;
-    if (ch.legend === "top") legend.position = "bottom";
-    base.cutout = ch.type === "doughnut" ? "58%" : 0;
-    base.plugins.tooltip.callbacks.label = x => { const t = x.dataset.data.reduce((s, v) => s + v, 0); return ` ${x.label}: ${fmt(x.raw)} (${fmt((x.raw / t) * 100, 1)} %)`; };
-    return { type: ch.type, data: { labels: items.map(o => o.label), datasets: [{ label: colName(c), data: items.map(o => o.v), backgroundColor: items.map((_, i) => pal[i % pal.length]), borderColor: css("--sheet"), borderWidth: 2 }] }, options: base };
-  }
-  if (ch.type === "radar") {
-    if (!sel.length) return need("Elige al menos una serie.");
-    if (labels.length < 3) return need("El radar necesita al menos 3 filas con datos.");
-    const ds = sel.map(c => ({ label: colName(c), data: d.series(c.id), borderColor: colColor(c), backgroundColor: alpha(toHex(colColor(c)), 0.15), borderWidth: 2, pointRadius: 3 }));
-    delete base.scales;
-    base.scales = { r: { beginAtZero: ch.zero !== false, grid: { color: grid }, angleLines: { color: grid }, pointLabels: { color: ink, font: { size: fs } }, ticks: { color: muted, backdropColor: "transparent", font: { family: css("--mono"), size: fs - 2 } } } };
-    if (ds.length === 1) legend.display = false;
-    return { type: "radar", data: { labels, datasets: ds }, options: base };
-  }
-  if (ch.type === "scatter") {
-    const cx = colById(ch.x), cy = colById(ch.y);
-    if (!cx || !cy) return need("Elige las columnas X e Y.");
-    const X = d.byId[cx.id], Y = d.byId[cy.id];
-    const pts = []; X.forEach((x, i) => { if (Number.isFinite(x) && Number.isFinite(Y[i])) pts.push({ x, y: Y[i] }); });
-    if (!pts.length) return need(`Rellena ${colName(cx)} y ${colName(cy)} en las mismas filas para ver la dispersión.`);
-    const ds = [{ label: `${colName(cy)} según ${colName(cx)}`, data: pts, backgroundColor: colColor(cy), pointRadius: 5, _noLabels: true }];
-    const f = S.fit(ch.model || "linear", X, Y);
-    if (!f.error) {
-      const line = []; for (let k = 0; k <= 80; k++) { const x = f.xmin + ((f.xmax - f.xmin) * k) / 80, y = f.predict(x); if (Number.isFinite(y)) line.push({ x, y }); }
-      ds.push({ type: "line", label: `${f.name} · R² = ${fmt(f.r2, 3)}`, data: line, borderColor: cx === cy ? css("--amber") : (colColor(cy) === css("--amber") ? css("--accent") : css("--amber")), borderWidth: 2, pointRadius: 0, tension: 0, _noLabels: true });
-    }
-    base.scales.x.type = "linear"; base.scales.y.beginAtZero = false;
-    base.scales.x.title = { display: true, text: ch.xTitle || colName(cx), color: muted };
-    base.scales.y.title = { display: true, text: ch.yTitle || colName(cy), color: muted };
-    base.plugins.tooltip.callbacks.label = x => ` (${fmt(x.raw.x)}; ${fmt(x.raw.y)})`;
-    return { type: "scatter", data: { datasets: ds }, options: base };
-  }
-  if (ch.type === "hist") {
-    const c = colById(ch.one) || p.cols[0]; if (!c) return need("Añade una columna con datos.");
-    const vals = d.vals(c.id); if (vals.length < 2) return need("El histograma necesita al menos 2 valores.");
-    const fr = S.frequency(vals, ch.bins || (vals.length > 6 ? undefined : undefined));
-    const labs = fr.rows.map(r => (fr.grouped ? intervalLabel(r) : fmt(r.value)));
-    legend.display = false; base.scales.x.grid.display = false; base.scales.y.ticks.precision = 0;
-    base.scales.y.title = { display: true, text: ch.yTitle || "Frecuencia", color: muted };
-    base.scales.x.title = { display: true, text: ch.xTitle || colName(c), color: muted };
-    return { type: "bar", data: { labels: labs, datasets: [{ label: "Frecuencia", data: fr.rows.map(r => r.fi), backgroundColor: colColor(c), borderColor: css("--sheet"), borderWidth: 1, barPercentage: fr.grouped ? 1 : 0.8, categoryPercentage: fr.grouped ? 1 : 0.8 }] }, options: base };
-  }
-  if (ch.type === "box") {
-    const cs = sel.filter(c => d.vals(c.id).length >= 2);
-    if (!cs.length) return need("Elige series con al menos 2 valores.");
-    const st = cs.map(c => S.describe(d.vals(c.id))), colors = cs.map(colColor);
-    legend.display = false; base.scales.y.beginAtZero = false;
-    base.scales.y.suggestedMin = Math.min(...st.map(s => s.min)); base.scales.y.suggestedMax = Math.max(...st.map(s => s.max));
-    base.scales.x.grid.display = false;
-    base.plugins.boxplot = { stats: st, colors };
-    base.plugins.tooltip.callbacks.label = x => { const s = st[x.dataIndex]; return [` Máx: ${fmt(s.max)}`, ` Q3: ${fmt(s.q3)}`, ` Mediana: ${fmt(s.median)}`, ` Media: ${fmt(s.mean)}`, ` Q1: ${fmt(s.q1)}`, ` Mín: ${fmt(s.min)}`]; };
-    return { type: "bar", data: { labels: cs.map(colName), datasets: [{ label: "Caja", data: st.map(s => [s.q1, s.q3]), backgroundColor: colors.map(c => alpha(toHex(c), 0.25)), borderColor: colors, borderWidth: 1.5, borderSkipped: false, barPercentage: 0.5 }] }, options: base };
-  }
-  return need("Tipo de gráfico desconocido.");
-}
-function intervalLabel(r) { return `${fmt(r.from)}–${fmt(r.to)}`; }
-function renderChart() {
-  renderChartControls();
-  if (chart) { chart.destroy(); chart = null; }
-  const cfg = buildConfig();
-  const empty = $("#chartEmpty");
-  if (cfg.empty) { empty.hidden = false; empty.textContent = cfg.empty; return; }
-  empty.hidden = true;
-  if ($("#view-chart").offsetParent === null && window.innerWidth < 1000) return; // vista oculta: se dibuja al mostrarla
-  chart = new Chart($("#chart"), cfg);
-}
-
-/* personalizar */
-$("#customBtn").addEventListener("click", () => {
-  const p = cur(), ch = p.chart;
-  const seg = (name, opts, val) => `<div class="seg" role="group" data-seg="${name}">${opts.map(([v, t]) => `<button data-act="seg:${name}:${v}" aria-pressed="${v === val}">${t}</button>`).join("")}</div>`;
-  openSheet(`<h3>Personalizar gráfico</h3>
-    <div class="field"><label class="label" for="cTitle">Título</label><input type="text" id="cTitle" value="${esc(ch.title)}" placeholder="Sin título"></div>
-    <div class="row2">
-      <div class="field"><label class="label" for="cX">Nombre del eje X</label><input type="text" id="cX" value="${esc(ch.xTitle)}"></div>
-      <div class="field"><label class="label" for="cY">Nombre del eje Y</label><input type="text" id="cY" value="${esc(ch.yTitle)}"></div>
-    </div>
-    <div class="field"><span class="label">Tamaño de letra</span>${seg("font", [["s", "Pequeña"], ["m", "Normal"], ["l", "Grande"]], ch.font)}</div>
-    <div class="field"><span class="label">Leyenda</span>${seg("legend", [["top", "Arriba"], ["bottom", "Abajo"], ["none", "Oculta"]], ch.legend)}</div>
-    <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="cZero" ${ch.zero !== false ? "checked" : ""}> Empezar el eje en cero</label>
-    <div class="field"><span class="label">Colores de las series</span>
-      <div class="colorlist">${p.cols.map(c => `<label><input type="color" data-color="${c.id}" value="${toHex(colColor(c))}"><span>${esc(colName(c))}</span></label>`).join("")}</div>
-      <button class="btn small ghost" data-act="resetColors" style="align-self:flex-start">Volver a los colores automáticos</button></div>
-    <div class="actions"><button class="btn primary" data-act="close">Hecho</button></div>`,
-  act => {
-    if (act.startsWith("seg:")) {
-      const [, k, v] = act.split(":"); ch[k] = v;
-      document.querySelectorAll(`[data-seg="${k}"] button`).forEach(b => b.setAttribute("aria-pressed", b.dataset.act === act));
-      persist(); renderChart();
-    }
-    if (act === "resetColors") { p.cols.forEach(c => (c.color = null)); document.querySelectorAll("[data-color]").forEach(i => (i.value = toHex(colColor(colById(i.dataset.color))))); persist(); renderTable(); renderChart(); }
-  });
-  const upd = () => { ch.title = $("#cTitle").value; ch.xTitle = $("#cX").value; ch.yTitle = $("#cY").value; ch.zero = $("#cZero").checked; persist(); scheduleChart(); };
-  ["cTitle", "cX", "cY"].forEach(id => $("#" + id).addEventListener("input", upd)); $("#cZero").addEventListener("change", upd);
-  document.querySelectorAll("[data-color]").forEach(i => i.addEventListener("input", () => { colById(i.dataset.color).color = i.value; persist(); scheduleChart(); }));
-});
-let chartT; const scheduleChart = () => { clearTimeout(chartT); chartT = setTimeout(() => { renderChart(); renderTableHeadColors(); }, 120); };
-function renderTableHeadColors() { document.querySelectorAll("#thead [data-col] i").forEach(i => { const c = colById(i.closest("[data-col]").dataset.col); if (c) i.style.background = colColor(c); }); }
-
-/* exportar imagen */
-$("#exportBtn").addEventListener("click", () => {
-  if (!chart) { toast("Primero añade datos al gráfico"); return; }
-  const src = chart.canvas, dpr = window.devicePixelRatio || 1, pad = 24 * dpr, hasTitle = !!cur().chart.title, titleH = hasTitle ? 0 : 40 * dpr;
-  const out = document.createElement("canvas"); out.width = src.width + pad * 2; out.height = src.height + pad * 2 + titleH;
-  const ctx = out.getContext("2d"); ctx.fillStyle = css("--sheet"); ctx.fillRect(0, 0, out.width, out.height);
-  if (!hasTitle) { ctx.fillStyle = css("--ink"); ctx.font = `600 ${Math.round(20 * dpr)}px ${css("--display")}`; ctx.fillText(cur().name, pad, pad + 20 * dpr); }
-  ctx.drawImage(src, pad, pad + titleH);
-  const url = out.toDataURL("image/png");
-  const fname = (cur().chart.title || cur().name).replace(/[^\w\- áéíóúñÁÉÍÓÚÑ]/g, "").trim() + ".png";
-  try { const a = document.createElement("a"); a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove(); } catch {}
-  openSheet(`<h3>Imagen del gráfico</h3><img src="${url}" alt="Gráfico ${esc(cur().name)}"><p class="hint">Si no se ha descargado, mantén pulsada la imagen y elige «Guardar imagen».</p><div class="actions"><button class="btn primary" data-act="close">Hecho</button></div>`, () => {});
-});
-
-/* =========================================================
-   Estadísticas
-   ========================================================= */
-const EXPLAIN = {
-  "Media": "La suma de todos los valores dividida entre cuántos hay.",
-  "Mediana": "El valor que queda en el centro al ordenarlos. Le afectan poco los valores extremos.",
-  "Moda": "El valor que más se repite.",
-  "Desviación típica": "Cuánto se separan los datos de la media, de promedio. Cuanto mayor, más dispersos. Es la muestral (divide entre n − 1).",
-  "Varianza": "La desviación típica al cuadrado.",
-  "Q1 / Q3": "El 25 % de los datos está por debajo de Q1 y el 75 % por debajo de Q3.",
-  "Rango intercuartílico": "Q3 − Q1: el ancho de la mitad central de los datos.",
-  "Coef. de variación": "La desviación típica en porcentaje de la media. Sirve para comparar la dispersión de series distintas.",
-  "Valores atípicos": "Datos que se alejan mucho del resto: más de 1,5 veces el rango intercuartílico por debajo de Q1 o por encima de Q3.",
-  "fi": "Frecuencia absoluta: cuántas veces aparece el valor o cuántos datos caen en el intervalo.",
-  "Fi": "Frecuencia absoluta acumulada: la suma de fi hasta esa fila.",
-  "hi": "Frecuencia relativa: fi dividida entre el total de datos.",
-  "Hi": "Frecuencia relativa acumulada: la suma de hi hasta esa fila.",
-  "xi": "Marca de clase: el punto medio del intervalo.",
-  "R²": "Coeficiente de determinación: qué parte de la variación de Y explica el modelo. 1 = la explica entera, 0 = nada.",
-  "Correlación (r)": "De −1 a 1. Cerca de 1: cuando X sube, Y sube. Cerca de −1: cuando X sube, Y baja. Cerca de 0: no hay relación lineal."
-};
-const info = k => (EXPLAIN[k] ? `<button class="info" data-k="${esc(k)}" aria-label="Qué es ${esc(k)}">ⓘ</button>` : "");
-function fillStatSelects() {
-  const p = cur(), st = p.stats = p.stats || {};
-  const idx = v => (typeof v === "number" ? p.cols[v]?.id : v);
-  st.sumCol = fillColSelect($("#sumCol"), idx(st.sumCol), 0);
-  st.freqCol = fillColSelect($("#freqCol"), idx(st.freqCol), 0);
-  st.regX = fillColSelect($("#regX"), idx(st.regX), 0);
-  st.regY = fillColSelect($("#regY"), idx(st.regY), 1);
-  st.regModel = st.regModel || "linear"; fillModelSelect($("#regModel"), st.regModel);
-  $("#freqBins").value = st.freqBins || "";
-}
-["sumCol", "freqCol", "regX", "regY", "regModel"].forEach(k => $("#" + k).addEventListener("change", e => { cur().stats[k] = e.target.value; persist(); renderStats(); }));
-$("#freqBins").addEventListener("input", e => { const v = parseInt(e.target.value, 10); cur().stats.freqBins = v >= 2 && v <= 40 ? v : null; persist(); renderFreq(); });
-
-function summaryRows(s) {
-  return [
-    ["Datos (n)", fmt(s.n, 0)], ["Suma", fmt(s.sum)], ["Media", fmt(s.mean)], ["Mediana", fmt(s.median)],
-    ["Moda", s.mode.length ? s.mode.slice(0, 3).map(x => fmt(x)).join(" · ") + (s.mode.length > 3 ? "…" : "") : "Sin moda"],
-    ["Mínimo", fmt(s.min)], ["Máximo", fmt(s.max)], ["Rango", fmt(s.max - s.min)],
-    ["Desviación típica", fmt(s.sd)], ["Varianza", fmt(s.variance)],
-    ["Q1 / Q3", `${fmt(s.q1)} / ${fmt(s.q3)}`], ["Rango intercuartílico", fmt(s.iqr)],
-    ["Coef. de variación", Number.isFinite(s.cv) ? fmt(s.cv, 1) + " %" : "—"],
-    ["Valores atípicos", s.outliers.length ? `<span class="warn">${s.outliers.slice(0, 6).map(x => fmt(x)).join(" · ")}${s.outliers.length > 6 ? "…" : ""}</span>` : "Ninguno"]
-  ];
-}
-function renderSummary() {
-  const d = data(), id = cur().stats.sumCol, vals = d.vals(id);
-  if (!vals.length) { $("#summary").innerHTML = `<p class="hint">Esta serie no tiene números todavía.</p>`; return; }
-  const rows = summaryRows(S.describe(vals));
-  $("#summary").innerHTML = `<dl class="stats two">${rows.map(([k, v]) => `<dt>${k}${info(k)}</dt><dd>${v}</dd>`).join("")}</dl>`;
-}
-let lastFreq = null;
-function renderFreq() {
-  const d = data(), st = cur().stats, vals = d.vals(st.freqCol);
-  if (vals.length < 2) { $("#freq").innerHTML = `<p class="hint">Hacen falta al menos 2 valores.</p>`; lastFreq = null; return; }
-  const fr = S.frequency(vals, st.freqBins || undefined); lastFreq = fr;
-  const maxF = Math.max(...fr.rows.map(r => r.fi));
-  $("#freq").innerHTML = `<div class="ftable-wrap"><table class="freq"><thead><tr>
-      <th>${fr.grouped ? "Intervalo" : "Valor"}</th>${fr.grouped ? `<th>xi ${info("xi")}</th>` : ""}<th>fi ${info("fi")}</th><th>Fi ${info("Fi")}</th><th>hi ${info("hi")}</th><th>Hi ${info("Hi")}</th><th>%</th></tr></thead>
-    <tbody>${fr.rows.map(r => `<tr><td>${fr.grouped ? `[${fmt(r.from)}, ${fmt(r.to)}${r.last ? "]" : ")"}` : fmt(r.value)}</td>${fr.grouped ? `<td>${fmt(r.mark)}</td>` : ""}
-      <td>${r.fi}</td><td>${r.Fi}</td><td>${fmt(r.hi, 3)}</td><td>${fmt(r.Hi, 3)}</td><td>${fmt(r.hi * 100, 1)}<span class="bar" style="width:${Math.round((r.fi / maxF) * 40)}px"></span></td></tr>`).join("")}</tbody>
-    <tfoot><tr><td>Total</td>${fr.grouped ? "<td></td>" : ""}<td>${fr.n}</td><td></td><td>1</td><td></td><td>100</td></tr></tfoot></table></div>
-    ${fr.grouped ? `<p class="hint">Intervalos ${st.freqBins ? "elegidos por ti" : "calculados con la regla de Sturges"}. Cambia el número de intervalos arriba si lo necesitas.</p>` : ""}`;
-}
-let lastReg = null;
-function renderReg() {
-  const d = data(), st = cur().stats;
-  const X = d.byId[st.regX] || [], Y = d.byId[st.regY] || [];
-  const cx = colById(st.regX), cy = colById(st.regY);
-  if (st.regX === st.regY) { $("#reg").innerHTML = `<p class="hint">Elige dos columnas distintas para X e Y.</p>`; lastReg = null; return; }
-  const f = S.fit(st.regModel, X, Y, fmtSig); lastReg = f;
-  if (f.error) { $("#reg").innerHTML = `<p class="hint">${esc(f.error)}</p>`; return; }
-  const all = Object.keys(S.MODELS).map(k => S.fit(k, X, Y)).filter(m => !m.error).sort((a, b) => b.r2 - a.r2);
-  let strength = "";
-  if (f.type === "linear") {
-    const a = Math.abs(f.r); strength = `Relación ${a >= 0.7 ? "fuerte" : a >= 0.4 ? "moderada" : "débil"} y ${f.r >= 0 ? "positiva" : "negativa"}`;
-  } else strength = `El modelo explica el ${fmt(f.r2 * 100, 1)} % de la variación de ${esc(colName(cy))}`;
-  $("#reg").innerHTML = `<div class="eq">${esc(f.eq)}</div>
-    <dl class="stats two">
-      <dt>R²${info("R²")}</dt><dd>${fmt(f.r2, 4)}</dd>
-      ${f.type === "linear" ? `<dt>Correlación (r)${info("Correlación (r)")}</dt><dd>${fmt(f.r, 4)}</dd>` : ""}
-      <dt>Parejas usadas</dt><dd>${f.n}${f.dropped ? ` <span class="warn">(${f.dropped} descartadas)</span>` : ""}</dd>
-      <dt>Interpretación</dt><dd style="font-family:var(--body);font-weight:400;text-align:right">${strength}</dd>
-    </dl>
-    ${f.dropped ? `<p class="hint">Este modelo solo admite ${f.type === "exponential" ? "valores de Y positivos" : f.type === "logarithmic" ? "valores de X positivos" : "valores de X e Y positivos"}.</p>` : ""}
-    <div class="predict"><label for="predX">Si ${esc(colName(cx))} =</label><input type="text" inputmode="decimal" id="predX" placeholder="${fmt((f.xmin + f.xmax) / 2, 1)}"><span>→ ${esc(colName(cy))} ≈</span><output id="predY">—</output></div>
-    <details class="help"><summary>Comparar todos los modelos</summary>
-      <dl class="stats" style="margin-top:6px">${all.map(m => `<dt>${m.name}</dt><dd>R² = ${fmt(m.r2, 4)}</dd>`).join("")}</dl>
-      <p class="hint" style="margin-top:6px">Un R² más alto se ajusta mejor a estos puntos, pero los polinomios de grado alto pueden dar predicciones raras fuera del rango de los datos.</p></details>`;
-  $("#predX").addEventListener("input", e => {
-    const x = S.parseNum(e.target.value), y = Number.isFinite(x) ? f.predict(x) : NaN;
-    $("#predY").textContent = fmtSig(y) + (Number.isFinite(x) && (x < f.xmin || x > f.xmax) ? " (fuera del rango de tus datos)" : "");
-  });
-}
-function renderStats() { fillStatSelects(); renderSummary(); renderFreq(); renderReg(); }
-$("#view-stats").addEventListener("click", e => {
-  const b = e.target.closest(".info"); if (!b) return;
-  const ex = $("#explain"), txt = `${b.dataset.k}: ${EXPLAIN[b.dataset.k]}`;
-  ex.hidden = ex.textContent === txt ? !ex.hidden : false; ex.textContent = txt;
-  if (!ex.hidden) ex.scrollIntoView({ block: "nearest", behavior: "smooth" });
-});
-$("#toScatter").addEventListener("click", () => {
-  const st = cur().stats, ch = cur().chart;
-  Object.assign(ch, { type: "scatter", x: st.regX, y: st.regY, model: st.regModel }); persist(); showView("view-chart"); renderChart();
-});
-function freqTSV() {
-  if (!lastFreq) return "";
-  const g = lastFreq.grouped;
-  const head = [g ? "Intervalo" : "Valor", ...(g ? ["xi"] : []), "fi", "Fi", "hi", "Hi", "%"];
-  const n = v => String(+v.toFixed(4)).replace(".", ",");
-  return [head, ...lastFreq.rows.map(r => [g ? `[${n(r.from)}; ${n(r.to)}${r.last ? "]" : ")"}` : n(r.value), ...(g ? [n(r.mark)] : []), r.fi, r.Fi, n(r.hi), n(r.Hi), n(r.hi * 100)])].map(r => r.join("\t")).join("\n");
-}
-$("#copyFreq").addEventListener("click", () => copyText(freqTSV()).then(ok => toast(ok ? "Tabla copiada. Pégala en Excel o Sheets." : "No se pudo copiar")));
-$("#copyStats").addEventListener("click", () => {
-  const p = cur(), d = data(); let t = `${p.name}\n`;
-  p.cols.forEach(c => {
-    const v = d.vals(c.id); if (!v.length) return;
-    t += `\n${colName(c)}\n` + summaryRows(S.describe(v)).map(([k, x]) => `${k}: ${String(x).replace(/<[^>]+>/g, "")}`).join("\n") + "\n";
-  });
-  if (lastFreq) t += `\nTabla de frecuencias (${colName(colById(p.stats.freqCol))})\n${freqTSV()}\n`;
-  if (lastReg && !lastReg.error) t += `\nRegresión ${lastReg.name} (${colName(colById(p.stats.regX))} → ${colName(colById(p.stats.regY))})\n${lastReg.eq}\nR² = ${fmt(lastReg.r2, 4)}\n`;
-  copyText(t.trim()).then(ok => toast(ok ? "Estadísticas copiadas" : "No se pudo copiar"));
-});
-
-/* =========================================================
-   Hojas, avisos, portapapeles, vistas
+   Hojas, avisos, portapapeles
    ========================================================= */
 let sheetHandler = null, lastFocus = null;
 function openSheet(html, handler) {
-  lastFocus = document.activeElement;
-  $("#sheetCard").innerHTML = html; sheetHandler = handler; $("#sheet").hidden = false;
-  const card = $("#sheetCard"); card.tabIndex = -1; setTimeout(() => { if (!document.activeElement?.closest("#sheetCard")) card.focus({ preventScroll: true }); }, 30);
+  if ($("#sheet").hidden) lastFocus = document.activeElement;
+  const old = $("#sheetCard"), fresh = old.cloneNode(false); old.replaceWith(fresh); // quita los oyentes de la hoja anterior
+  $("#sheetCard").innerHTML = html; sheetHandler = handler; $("#sheet").hidden = false; $("#sheetCard").scrollTop = 0;
+  setTimeout(() => { if (!document.activeElement?.closest("#sheetCard")) $("#sheetCard").focus({ preventScroll: true }); }, 30);
 }
 function closeSheet() { $("#sheet").hidden = true; sheetHandler = null; lastFocus?.focus?.({ preventScroll: true }); }
 $("#sheet").addEventListener("click", e => {
   if (e.target.id === "sheet") return closeSheet();
-  const b = e.target.closest("[data-act]"); if (!b) return;
+  const b = e.target.closest("[data-act]"); if (!b || b.disabled) return;
   if (b.dataset.act === "close") return closeSheet();
-  if (sheetHandler) sheetHandler(b.dataset.act);
+  if (sheetHandler) sheetHandler(b.dataset.act, b);
 });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#sheet").hidden) closeSheet(); });
-let toastT; function toast(m) { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 2400); }
-async function copyText(t) {
-  try { await navigator.clipboard.writeText(t); return true; } catch {
-    try { const ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); const ok = document.execCommand("copy"); ta.remove(); return ok; } catch { return false; }
+document.addEventListener("keydown", e => { if (e.key === "Escape") { if (!$("#fs").hidden) closeFullscreen(); else if (!$("#sheet").hidden) closeSheet(); } });
+let toastT;
+function toast(m, actLabel, actFn) {
+  const el = $("#toast"); el.innerHTML = `<span>${esc(m)}</span>${actLabel ? `<button>${esc(actLabel)}</button>` : ""}`; el.hidden = false;
+  if (actLabel) el.querySelector("button").onclick = () => { el.hidden = true; actFn(); };
+  clearTimeout(toastT); toastT = setTimeout(() => (el.hidden = true), actLabel ? 4500 : 2600);
+}
+async function copyText(s) {
+  try { await navigator.clipboard.writeText(s); return true; } catch {
+    try { const ta = document.createElement("textarea"); ta.value = s; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); const ok = document.execCommand("copy"); ta.remove(); return ok; } catch { return false; }
   }
 }
+// traduce los mensajes de error del motor de fórmulas
+function tErr(m) {
+  const rules = [[/^No entiendo «(.*)»\.$/, "No entiendo «{x}»."], [/^Falta «(.*)»\.$/, "Falta «{x}»."], [/^«(.*)» no es una columna ni una función conocida\.$/, "«{x}» no es una columna ni una función conocida."],
+    [/^La columna (.*) no existe\.$/, "La columna {x} no existe."], [/^No conozco la función «(.*)»\.$/, "No conozco la función «{x}»."], [/^Sobra «(.*)»\.$/, "Sobra «{x}»."]];
+  for (const [re, k] of rules) { const mm = m.match(re); if (mm) return t(k, { x: mm[1] }); }
+  return t(m);
+}
+
+/* =========================================================
+   Vistas
+   ========================================================= */
+let currentView = "view-data";
+const wide = () => window.innerWidth >= 1000;
 function showView(id) {
-  document.querySelectorAll(".view").forEach(v => (v.hidden = v.id !== id));
-  document.querySelectorAll("nav.tabs [data-view]").forEach(b => b.setAttribute("aria-selected", b.dataset.view === id));
-  if (id === "view-chart") renderChart();
-  if (window.innerWidth < 1000) window.scrollTo(0, 0);
+  currentView = id;
+  $$("main.views > .view").forEach(v => (v.hidden = v.id !== id));
+  $$("#tabs [data-view]").forEach(b => b.setAttribute("aria-selected", b.dataset.view === id));
+  $("#views").classList.toggle("panel-mode", id === "view-panel");
+  $$("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", (b.dataset.mode === "panel") === (id === "view-panel")));
+  if (id === "view-chart" || (wide() && id !== "view-panel")) renderChart();
+  if (id === "view-panel") renderPanel(); else destroyPanel();
+  if (!wide()) window.scrollTo(0, 0);
 }
-document.querySelectorAll("nav.tabs [data-view]").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
+$$("#tabs [data-view]").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
+$("#modeSeg").addEventListener("click", e => { const b = e.target.closest("[data-mode]"); if (b) showView(b.dataset.mode === "panel" ? "view-panel" : "view-chart"); });
 
-let refreshT; const scheduleRefresh = () => { clearTimeout(refreshT); refreshT = setTimeout(refresh, 220); };
-function refresh() { renderChart(); renderStats(); }
-function renderAll() { dirty(); renderProjects(); renderTable(); refresh(); }
-matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { renderTable(); refresh(); });
-new MutationObserver(() => { renderTable(); refresh(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-let wasWide = window.innerWidth >= 1000;
-window.addEventListener("resize", () => { const w = window.innerWidth >= 1000; if (w !== wasWide) { wasWide = w; renderChart(); } });
-document.fonts?.ready.then(refresh);
-renderAll();
-
-/* modo sin conexión (PWA) */
-if ("serviceWorker" in navigator && location.protocol === "https:" && !/claude|anthropic/.test(location.hostname)) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+/* =========================================================
+   Tutorial
+   ========================================================= */
+function showOnboarding() {
+  const ink = "var(--ink)", acc = "var(--accent)", amb = "var(--amber)", ln = "var(--line)";
+  const slides = [
+    { h: t("Escribe o importa tus datos"), p: t("Rellena la tabla, pega desde Excel, abre un archivo o haz una foto a una tabla."),
+      svg: `<rect x="30" y="20" width="200" height="110" rx="10" fill="var(--sheet)" stroke="${ln}" stroke-width="2"/><path d="M30 46h200M30 72h200M30 98h200M95 20v110M162 20v110" stroke="${ln}" stroke-width="2"/><rect x="104" y="54" width="48" height="12" rx="3" fill="${acc}" opacity=".25"/><rect x="40" y="29" width="40" height="9" rx="3" fill="${ink}" opacity=".7"/><rect x="104" y="29" width="40" height="9" rx="3" fill="${ink}" opacity=".7"/><rect x="171" y="29" width="40" height="9" rx="3" fill="${ink}" opacity=".7"/>` },
+    { h: t("Elige el gráfico"), p: t("Trece tipos, varios gráficos por proyecto y un panel para verlos todos juntos."),
+      svg: `<path d="M40 130h190" stroke="${ln}" stroke-width="2"/><rect x="52" y="80" width="26" height="50" rx="4" fill="${acc}"/><rect x="92" y="50" width="26" height="80" rx="4" fill="${acc}"/><rect x="132" y="66" width="26" height="64" rx="4" fill="${acc}"/><rect x="172" y="30" width="26" height="100" rx="4" fill="${amb}"/><path d="M50 70l50-30 40 18 60-36" fill="none" stroke="${ink}" stroke-width="3" stroke-linecap="round"/>` },
+    { h: t("Entiende tus números"), p: t("Estadísticas, frecuencias, regresiones y contrastes, con explicaciones y el cálculo paso a paso."),
+      svg: `<rect x="40" y="24" width="180" height="104" rx="10" fill="var(--sheet)" stroke="${ln}" stroke-width="2"/><text x="56" y="56" font-family="var(--mono)" font-size="16" fill="${ink}">x̄ = ${fmt(6.31)}</text><text x="56" y="84" font-family="var(--mono)" font-size="16" fill="${ink}">s = ${fmt(1.77)}</text><text x="56" y="112" font-family="var(--mono)" font-size="16" fill="${acc}">R² = ${fmt(0.957, 3)}</text><circle cx="190" cy="56" r="14" fill="${acc}" opacity=".2"/><text x="185" y="62" font-size="16" fill="${acc}">i</text>` }
+  ];
+  let k = 0;
+  const draw = () => {
+    const s = slides[k];
+    $("#onb").innerHTML = `<div class="card" role="dialog" aria-modal="true"><svg class="ill" viewBox="0 0 260 150" aria-hidden="true">${s.svg}</svg>
+      <h3>${esc(s.h)}</h3><p>${esc(s.p)}</p><div class="dots">${slides.map((_, i) => `<i class="${i === k ? "on" : ""}"></i>`).join("")}</div>
+      <div class="actions"><button class="btn ghost" data-o="skip">${t("Saltar")}</button><button class="btn primary" data-o="next">${k < slides.length - 1 ? t("Siguiente") : t("Empezar")}</button></div></div>`;
+    $("#onb").hidden = false; $("#onb [data-o=next]").focus();
+  };
+  const done = () => { $("#onb").hidden = true; settings.tutorialDone = true; saveSettings(); };
+  $("#onb").onclick = e => { const b = e.target.closest("[data-o]"); if (!b) return; if (b.dataset.o === "skip") done(); else if (k < slides.length - 1) { k++; draw(); } else done(); };
+  draw();
 }
+
+/* =========================================================
+   Ciclo de renderizado
+   ========================================================= */
+function refresh() { updateCount(); renderChartUI(); renderStats(); if (currentView === "view-panel") renderPanel(); }
+function renderAll() { dirty(); renderProjects(); renderTable(); refresh(); updateUndo(); }

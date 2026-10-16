@@ -3,14 +3,21 @@
   "use strict";
 
   /* ---------- números ---------- */
+  // Configuración regional: en español la coma es decimal; en inglés la coma separa miles.
+  const CFG = { decimalComma: true };
+  function setLocale(o) { Object.assign(CFG, o || {}); }
   function parseNum(s) {
     if (typeof s === "number") return Number.isFinite(s) ? s : NaN;
     if (s === null || s === undefined) return NaN;
-    let t = String(s).trim().replace(/\s/g, "").replace(/[€$%]/g, "");
+    let t = String(s).trim().replace(/[\s\u00a0]/g, "").replace(/[€$%£]/g, "").replace(/\u2212/g, "-");
     if (!t) return NaN;
     if (t.includes(",") && t.includes(".")) {
       t = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
-    } else t = t.replace(",", ".");
+    } else if (t.includes(",")) {
+      if (!CFG.decimalComma && /^[-+]?\d{1,3}(,\d{3})+$/.test(t)) t = t.replace(/,/g, "");
+      else if ((t.match(/,/g) || []).length > 1) t = t.replace(/,/g, "");
+      else t = t.replace(",", ".");
+    }
     if (!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(t)) return NaN;
     const n = Number(t);
     return Number.isFinite(n) ? n : NaN;
@@ -195,7 +202,9 @@
 
   function compileFormula(src, ncols) {
     const toks = [];
-    const re = /\s*(?:(\d+(?:[.,]\d+)?(?![\d]))|([A-Za-zÁÉÍÓÚáéíóúñÑ_]+)|(<=|>=|<>|!=|==|[-+*/^(),;<>=]))/y;
+    const re = CFG.decimalComma
+      ? /\s*(?:(\d+(?:[.,]\d+)?(?![\d]))|([A-Za-zÁÉÍÓÚáéíóúñÑ_]+)|(<=|>=|<>|!=|==|[-+*/^(),;<>=]))/y
+      : /\s*(?:(\d+(?:\.\d+)?(?![\d]))|([A-Za-zÁÉÍÓÚáéíóúñÑ_]+)|(<=|>=|<>|!=|==|[-+*/^(),;<>=]))/y;
     let pos = 0, m;
     const s = String(src).trim();
     while (pos < s.length) {
@@ -298,7 +307,156 @@
     return { values: out, errors };
   }
 
-  const api = { parseNum, sum, mean, median, quantile, mode, variance, sd, describe, fit, MODELS, frequency, compileFormula, computeTable, letterIndex, indexLetter };
+
+  /* ---------- funciones especiales ---------- */
+  function logGamma(x) { // Lanczos (g = 7, n = 9)
+    const c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059,
+      12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    if (x < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * x))) - logGamma(1 - x);
+    x -= 1; let a = c[0]; const t = x + 7.5;
+    for (let i = 1; i < 9; i++) a += c[i] / (x + i);
+    return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+  }
+  function gammaP(a, x) { // gamma incompleta regularizada inferior
+    if (x <= 0) return 0;
+    if (x < a + 1) {
+      let ap = a, sumv = 1 / a, del = sumv;
+      for (let n = 0; n < 1000; n++) { ap++; del *= x / ap; sumv += del; if (Math.abs(del) < Math.abs(sumv) * 1e-15) break; }
+      return sumv * Math.exp(-x + a * Math.log(x) - logGamma(a));
+    }
+    let b = x + 1 - a, c = 1 / 1e-300, d = 1 / b, h = d;
+    for (let i = 1; i < 1000; i++) {
+      const an = -i * (i - a); b += 2;
+      d = an * d + b; if (Math.abs(d) < 1e-300) d = 1e-300;
+      c = b + an / c; if (Math.abs(c) < 1e-300) c = 1e-300;
+      d = 1 / d; const del = d * c; h *= del; if (Math.abs(del - 1) < 1e-15) break;
+    }
+    return 1 - Math.exp(-x + a * Math.log(x) - logGamma(a)) * h;
+  }
+  function betacf(a, b, x) {
+    const qab = a + b, qap = a + 1, qam = a - 1;
+    let c = 1, d = 1 - (qab * x) / qap; if (Math.abs(d) < 1e-300) d = 1e-300; d = 1 / d; let h = d;
+    for (let m = 1; m <= 1000; m++) {
+      const m2 = 2 * m;
+      let aa = (m * (b - m) * x) / ((qam + m2) * (a + m2));
+      d = 1 + aa * d; if (Math.abs(d) < 1e-300) d = 1e-300; c = 1 + aa / c; if (Math.abs(c) < 1e-300) c = 1e-300; d = 1 / d; h *= d * c;
+      aa = (-(a + m) * (qab + m) * x) / ((a + m2) * (qap + m2));
+      d = 1 + aa * d; if (Math.abs(d) < 1e-300) d = 1e-300; c = 1 + aa / c; if (Math.abs(c) < 1e-300) c = 1e-300; d = 1 / d;
+      const del = d * c; h *= del; if (Math.abs(del - 1) < 1e-15) break;
+    }
+    return h;
+  }
+  function betaI(a, b, x) { // beta incompleta regularizada
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    const bt = Math.exp(logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+    return x < (a + 1) / (a + b + 2) ? (bt * betacf(a, b, x)) / a : 1 - (bt * betacf(b, a, 1 - x)) / b;
+  }
+
+  /* ---------- distribuciones ---------- */
+  const normCdf = (x, mu = 0, sigma = 1) => {
+    const z = (x - mu) / sigma; if (!Number.isFinite(z)) return z > 0 ? 1 : 0;
+    const p = gammaP(0.5, (z * z) / 2) / 2; return z >= 0 ? 0.5 + p : 0.5 - p;
+  };
+  const normPdf = (x, mu = 0, sigma = 1) => Math.exp(-0.5 * ((x - mu) / sigma) ** 2) / (sigma * Math.sqrt(2 * Math.PI));
+  function normInv(p, mu = 0, sigma = 1) { // Acklam + un paso de Newton
+    if (p <= 0) return -Infinity; if (p >= 1) return Infinity;
+    const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
+    const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+    const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+    const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+    const pl = 0.02425; let q, r, x;
+    if (p < pl) { q = Math.sqrt(-2 * Math.log(p)); x = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+    else if (p <= 1 - pl) { q = p - 0.5; r = q * q; x = ((((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q) / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1); }
+    else { q = Math.sqrt(-2 * Math.log(1 - p)); x = -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+    for (let i = 0; i < 2; i++) { const e = normCdf(x) - p; x -= e / normPdf(x); }
+    return mu + sigma * x;
+  }
+  function tCdf(t, df) {
+    if (!Number.isFinite(t)) return t > 0 ? 1 : 0;
+    const x = df / (df + t * t), tail = betaI(df / 2, 0.5, x) / 2;
+    return t > 0 ? 1 - tail : tail;
+  }
+  function tInv(p, df) {
+    let lo = -1e3, hi = 1e3;
+    for (let i = 0; i < 200; i++) { const mid = (lo + hi) / 2; if (tCdf(mid, df) < p) lo = mid; else hi = mid; if (hi - lo < 1e-12) break; }
+    return (lo + hi) / 2;
+  }
+  const chi2Cdf = (x, k) => (x <= 0 ? 0 : gammaP(k / 2, x / 2));
+  const fCdf = (x, d1, d2) => (x <= 0 ? 0 : betaI(d1 / 2, d2 / 2, (d1 * x) / (d1 * x + d2)));
+  function binomPmf(k, n, p) {
+    if (k < 0 || k > n || !Number.isInteger(k)) return 0;
+    if (p === 0) return k === 0 ? 1 : 0; if (p === 1) return k === n ? 1 : 0;
+    return Math.exp(logGamma(n + 1) - logGamma(k + 1) - logGamma(n - k + 1) + k * Math.log(p) + (n - k) * Math.log(1 - p));
+  }
+  function binomCdf(k, n, p) { if (k < 0) return 0; if (k >= n) return 1; let s = 0; for (let i = 0; i <= Math.floor(k); i++) s += binomPmf(i, n, p); return Math.min(1, s); }
+
+  /* ---------- contrastes de hipótesis ---------- */
+  function pFromT(t, df, alt) { // alt: "two" | "greater" | "less"
+    if (alt === "greater") return 1 - tCdf(t, df);
+    if (alt === "less") return tCdf(t, df);
+    return Math.min(1, 2 * (1 - tCdf(Math.abs(t), df)));
+  }
+  function tTestOne(xs, mu0, alt = "two", conf = 0.95) {
+    const n = xs.length; if (n < 2) return { error: "n" };
+    const m = mean(xs), s = sd(xs), se = s / Math.sqrt(n), df = n - 1;
+    if (!se) return { error: "sd0" };
+    const t = (m - mu0) / se, q = tInv(1 - (1 - conf) / 2, df);
+    return { n, mean: m, sd: s, se, df, t, p: pFromT(t, df, alt), ci: [m - q * se, m + q * se], d: (m - mu0) / s };
+  }
+  function tTestWelch(a, b, alt = "two", conf = 0.95) {
+    const n1 = a.length, n2 = b.length; if (n1 < 2 || n2 < 2) return { error: "n" };
+    const m1 = mean(a), m2 = mean(b), v1 = variance(a), v2 = variance(b);
+    const se = Math.sqrt(v1 / n1 + v2 / n2); if (!se) return { error: "sd0" };
+    const df = (v1 / n1 + v2 / n2) ** 2 / ((v1 / n1) ** 2 / (n1 - 1) + (v2 / n2) ** 2 / (n2 - 1));
+    const t = (m1 - m2) / se, q = tInv(1 - (1 - conf) / 2, df), diff = m1 - m2;
+    const sp = Math.sqrt(((n1 - 1) * v1 + (n2 - 1) * v2) / (n1 + n2 - 2));
+    return { n1, n2, m1, m2, sd1: Math.sqrt(v1), sd2: Math.sqrt(v2), diff, se, df, t, p: pFromT(t, df, alt), ci: [diff - q * se, diff + q * se], d: sp ? diff / sp : NaN };
+  }
+  function tTestPaired(a, b, alt = "two", conf = 0.95) {
+    const dif = []; for (let i = 0; i < Math.min(a.length, b.length); i++) if (Number.isFinite(a[i]) && Number.isFinite(b[i])) dif.push(a[i] - b[i]);
+    const r = tTestOne(dif, 0, alt, conf); if (r.error) return r;
+    return Object.assign(r, { diff: r.mean, pairs: dif.length });
+  }
+  function anova(groups) { // groups: [[...], ...]
+    const g = groups.filter(x => x.length); const k = g.length, all = [].concat(...g), N = all.length;
+    if (k < 2 || N - k < 1) return { error: "n" };
+    const gm = mean(all); let ssb = 0, ssw = 0;
+    g.forEach(x => { const m = mean(x); ssb += x.length * (m - gm) ** 2; x.forEach(v => (ssw += (v - m) ** 2)); });
+    const df1 = k - 1, df2 = N - k; if (!ssw) return { error: "sd0" };
+    const F = ssb / df1 / (ssw / df2);
+    return { k, N, df1, df2, ssb, ssw, F, p: 1 - fCdf(F, df1, df2), eta2: ssb / (ssb + ssw), means: g.map(mean), ns: g.map(x => x.length), sds: g.map(sd) };
+  }
+  function corrTest(r, n) {
+    if (n < 3 || !Number.isFinite(r)) return { error: "n" };
+    const df = n - 2; if (Math.abs(r) >= 1) return { t: Infinity, df, p: 0 };
+    const t = (r * Math.sqrt(df)) / Math.sqrt(1 - r * r); return { t, df, p: pFromT(t, df, "two") };
+  }
+
+  /* ---------- categorías y tablas cruzadas ---------- */
+  const keyCmp = (a, b) => { const x = parseNum(a), y = parseNum(b); if (Number.isFinite(x) && Number.isFinite(y)) return x - y; return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" }); };
+  function countCategories(vals) {
+    const m = new Map(); vals.forEach(v => { const k = String(v ?? "").trim(); if (k === "") return; m.set(k, (m.get(k) || 0) + 1); });
+    return [...m].map(([key, n]) => ({ key, n })).sort((a, b) => keyCmp(a.key, b.key));
+  }
+  function crosstab(rv, cv) {
+    const pairs = []; for (let i = 0; i < rv.length; i++) { const a = String(rv[i] ?? "").trim(), b = String(cv[i] ?? "").trim(); if (a !== "" && b !== "") pairs.push([a, b]); }
+    const rk = [...new Set(pairs.map(p => p[0]))].sort(keyCmp), ck = [...new Set(pairs.map(p => p[1]))].sort(keyCmp);
+    const counts = rk.map(() => ck.map(() => 0));
+    pairs.forEach(([a, b]) => counts[rk.indexOf(a)][ck.indexOf(b)]++);
+    return { rowKeys: rk, colKeys: ck, counts, n: pairs.length };
+  }
+  function chi2Independence(counts) {
+    const R = counts.length, C = counts[0] ? counts[0].length : 0;
+    if (R < 2 || C < 2) return { error: "dims" };
+    const rs = counts.map(r => sum(r)), cs = counts[0].map((_, j) => sum(counts.map(r => r[j]))), N = sum(rs);
+    if (!N) return { error: "n" };
+    let chi2 = 0, low = 0; const expected = counts.map((r, i) => r.map((_, j) => (rs[i] * cs[j]) / N));
+    counts.forEach((r, i) => r.forEach((o, j) => { const e = expected[i][j]; if (e > 0) chi2 += (o - e) ** 2 / e; if (e < 5) low++; }));
+    const df = (R - 1) * (C - 1);
+    return { chi2, df, p: 1 - chi2Cdf(chi2, df), expected, N, cramerV: Math.sqrt(chi2 / (N * (Math.min(R, C) - 1))), lowExpected: low / (R * C), minExpected: Math.min(...[].concat(...expected)) };
+  }
+
+  const api = { setLocale, parseNum, logGamma, gammaP, betaI, normCdf, normPdf, normInv, tCdf, tInv, chi2Cdf, fCdf, binomPmf, binomCdf, pFromT, tTestOne, tTestWelch, tTestPaired, anova, corrTest, countCategories, crosstab, chi2Independence, keyCmp, sum, mean, median, quantile, mode, variance, sd, describe, fit, MODELS, frequency, compileFormula, computeTable, letterIndex, indexLetter };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.GStats = api;
 })(typeof self !== "undefined" ? self : this);
