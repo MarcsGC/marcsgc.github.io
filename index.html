@@ -12,10 +12,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: papel milimetrado; móvil = una vista a la vez con barra inferior, escritorio = datos | gráfico | estadísticas */
+/* Layout: papel milimetrado; móvil = una vista a la vez con barra inferior, escritorio = datos | gráfico + estadísticas */
 :root{
   --paper:#f4f7f5; --sheet:#ffffff; --grid:#e1e9e5; --ink:#17231f; --muted:#5b6b65;
-  --accent:#0e6b5c; --accent-soft:#d6ece6; --amber:#c47a12; --danger:#b3392f; --line:#cfdad5;
+  --accent:#0e6b5c; --accent-soft:#d6ece6; --amber:#c47a12; --danger:#b3392f; --line:#cfdad5; --formula:#f1f5f3;
   --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --body:"IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
@@ -23,16 +23,15 @@
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --paper:#0f1513; --sheet:#161e1b; --grid:#1d2824; --ink:#e3ece8; --muted:#93a59e;
-  --accent:#4cc3aa; --accent-soft:#183a33; --amber:#e8a646; --danger:#ef7a6f; --line:#2a3833; color-scheme:dark}}
+  --accent:#4cc3aa; --accent-soft:#183a33; --amber:#e8a646; --danger:#ef7a6f; --line:#2a3833; --formula:#1a2421; color-scheme:dark}}
 :root[data-theme="dark"]{
   --paper:#0f1513; --sheet:#161e1b; --grid:#1d2824; --ink:#e3ece8; --muted:#93a59e;
-  --accent:#4cc3aa; --accent-soft:#183a33; --amber:#e8a646; --danger:#ef7a6f; --line:#2a3833; color-scheme:dark}
+  --accent:#4cc3aa; --accent-soft:#183a33; --amber:#e8a646; --danger:#ef7a6f; --line:#2a3833; --formula:#1a2421; color-scheme:dark}
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%}
-body{margin:0}
-body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;
   background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
   background-size:24px 24px}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -41,25 +40,29 @@ button{cursor:pointer}
 
 .app{display:flex;flex-direction:column;min-height:100%;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
-  padding-block:12px 96px;max-width:1280px;margin:0 auto}
-header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:4px 14px}
-.brand{font-family:var(--display);font-weight:800;font-size:1.55rem;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+  padding-block:12px 96px;max-width:1320px;margin:0 auto}
+header.top{display:flex;align-items:center;gap:10px;padding-block:4px 14px}
+.brand{font-family:var(--display);font-weight:800;font-size:1.45rem;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .brand svg{width:28px;height:28px}
-.project{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;min-width:0}
-.project select{max-width:52vw;min-width:0}
+.brand span{display:none}
+@media (min-width:520px){.brand span{display:inline}}
+.project{display:flex;gap:6px;align-items:center;margin-left:auto;min-width:0;flex:1;justify-content:flex-end}
+.project select{min-width:0;flex:1;max-width:340px}
 
-select,input[type=text],input[type=number],textarea{background:var(--sheet);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+select,input[type=text],input[type=number],textarea{background:var(--sheet);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+input[type=color]{width:44px;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--sheet);padding:3px}
 .btn{border:1px solid var(--line);background:var(--sheet);border-radius:8px;padding:8px 12px;font-weight:500;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .btn:hover{border-color:var(--accent)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--sheet)}
 .btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
 .btn.danger{color:var(--danger)}
-.btn.icon{padding:8px;width:38px;justify-content:center}
+.btn.icon{padding:8px;width:38px;justify-content:center;flex-shrink:0}
+.btn.small{padding:5px 10px;font-size:.85rem}
 
 main.views{display:grid;gap:16px;flex:1}
-@media (min-width:980px){
-  main.views{grid-template-columns:minmax(300px,1fr) minmax(0,1.5fr);grid-template-areas:"data chart" "data stats"}
-  #view-data{grid-area:data}#view-chart{grid-area:chart}#view-stats{grid-area:stats}
+@media (min-width:1000px){
+  main.views{grid-template-columns:minmax(340px,1fr) minmax(0,1.45fr);grid-template-areas:"data chart" "data stats";align-items:start}
+  #view-data{grid-area:data;position:sticky;top:12px}#view-chart{grid-area:chart}#view-stats{grid-area:stats}
   nav.tabs{display:none!important}
   .app{padding-bottom:24px}
   .view[hidden]{display:flex!important}
@@ -67,38 +70,58 @@ main.views{display:grid;gap:16px;flex:1}
 .view{background:var(--sheet);border:1px solid var(--line);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .view h2{font-family:var(--display);font-weight:600;font-size:1.15rem;margin:0;letter-spacing:-.01em}
 .vhead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.vhead .grp{display:flex;gap:6px;flex-wrap:wrap}
 .hint{color:var(--muted);font-size:.86rem;margin:0}
+.label{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
 
 /* tabla de datos */
-.series-names{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.series-names label{display:flex;flex-direction:column;gap:4px;font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.series-names input{text-transform:none;letter-spacing:0;font-size:.95rem;color:var(--ink);width:100%;min-width:0}
-.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
-table.data{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
-table.data th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;padding:6px 8px;background:var(--paper);border-bottom:1px solid var(--line);font-weight:600}
-table.data td{border-bottom:1px solid var(--grid);padding:0}
-table.data td:first-child{width:28px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:.75rem}
-table.data input{width:100%;min-width:70px;border:0;border-radius:0;background:transparent;padding:9px 8px}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:8px;max-height:min(62vh,640px)}
+table.data{border-collapse:separate;border-spacing:0;width:100%;font-variant-numeric:tabular-nums}
+table.data th{position:sticky;top:0;z-index:1;background:var(--paper);border-bottom:1px solid var(--line);padding:0;text-align:left;font-weight:600}
+table.data td{border-bottom:1px solid var(--grid);padding:0;background:var(--sheet)}
+table.data .num-col{width:30px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:.72rem;padding:0 4px}
+table.data input{width:100%;min-width:84px;border:0;border-radius:0;background:transparent;padding:9px 8px}
 table.data input.num{font-family:var(--mono);text-align:right}
 table.data input:focus{background:var(--accent-soft);outline:none}
+table.data td.calc{background:var(--formula);font-family:var(--mono);text-align:right;padding:9px 8px;color:var(--muted);min-width:84px;white-space:nowrap}
+table.data td.calc.err{color:var(--danger)}
+.colhead{display:flex;flex-direction:column;align-items:stretch;gap:1px;border:0;background:none;padding:6px 8px;width:100%;text-align:left;min-width:84px}
+.colhead .l{font-family:var(--mono);font-size:.68rem;color:var(--muted);display:flex;align-items:center;gap:5px}
+.colhead .l i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.colhead .n{font-size:.82rem;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.colhead:hover .n{color:var(--accent)}
+.labelhead{padding:6px 8px}
+.labelhead input{border:0;background:transparent;padding:0;font-weight:600;font-size:.82rem;width:100%;min-width:84px}
+.labelhead .l{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+.addcol{border:0;background:none;color:var(--accent);font-weight:600;padding:6px 10px;white-space:nowrap}
 table.data .del{border:0;background:none;color:var(--muted);padding:6px 8px;font-size:1.1rem}
 .row-actions{display:flex;gap:8px;flex-wrap:wrap}
 
 /* gráfico */
-.types{display:flex;gap:6px;flex-wrap:wrap}
-.types button{border:1px solid var(--line);background:var(--sheet);border-radius:999px;padding:7px 13px;font-size:.88rem;white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
-.types button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--sheet)}
-.types svg{width:16px;height:16px}
-.chartbox{position:relative;height:min(58vh,420px);min-height:260px}
-.opts{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:.88rem;color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{border:1px solid var(--line);background:var(--sheet);border-radius:999px;padding:6px 12px;font-size:.86rem;white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
+.chips button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--sheet)}
+.chips svg{width:16px;height:16px}
+.chips.series button i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.chips.series button[aria-pressed=false]{color:var(--muted)}
+.chips.series button[aria-pressed=false] i{opacity:.35}
+.chips.series button[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.chartbox{position:relative;height:min(58vh,440px);min-height:280px}
+.opts{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center;font-size:.88rem;color:var(--muted)}
 .opts label{display:inline-flex;gap:6px;align-items:center}
-.opts input[type=number]{width:70px;padding:5px 8px}
+.opts select,.opts input[type=number]{padding:5px 8px}
+.opts input[type=number]{width:70px}
+.empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);padding:24px}
 
 /* estadísticas */
-.stat-groups{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
-.sgroup h3{margin:0 0 6px;font-size:.78rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
-.sgroup h3 i{width:10px;height:10px;border-radius:2px;display:inline-block}
-dl.stats{margin:0;display:grid;grid-template-columns:1fr auto;font-variant-numeric:tabular-nums}
+.sblock{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.sblock:first-of-type{border-top:0;padding-top:0}
+.sblock h3{margin:0;font-family:var(--display);font-weight:600;font-size:1rem}
+.sel-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.88rem;color:var(--muted)}
+.sel-row label{display:inline-flex;gap:6px;align-items:center}
+.sel-row select{padding:6px 8px;max-width:100%}
+dl.stats{margin:0;display:grid;grid-template-columns:1fr auto;font-variant-numeric:tabular-nums;column-gap:12px}
+@media (min-width:640px){dl.stats.two{grid-template-columns:1fr auto 1fr auto;column-gap:20px}}
 dl.stats dt,dl.stats dd{padding:6px 0;border-bottom:1px dashed var(--line);margin:0}
 dl.stats dt{color:var(--muted);font-size:.9rem;display:flex;align-items:center;gap:4px}
 dl.stats dd{font-family:var(--mono);text-align:right;font-weight:500}
@@ -106,6 +129,17 @@ dl.stats dd{font-family:var(--mono);text-align:right;font-weight:500}
 .explain{background:var(--accent-soft);border-radius:8px;padding:10px 12px;font-size:.88rem;margin:0}
 .badge{font-family:var(--mono);font-size:.75rem;padding:2px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
 .warn{color:var(--amber)}
+.eq{font-family:var(--mono);font-size:1rem;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:nowrap}
+.predict{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.92rem}
+.predict input{width:110px;font-family:var(--mono)}
+.predict output{font-family:var(--mono);font-weight:600;color:var(--accent)}
+.ftable-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table.freq{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:.88rem}
+table.freq th{background:var(--paper);color:var(--muted);font-weight:600;font-size:.74rem;text-align:right;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.freq th:first-child,table.freq td:first-child{text-align:left}
+table.freq td{padding:6px 10px;border-bottom:1px solid var(--grid);text-align:right;font-family:var(--mono);white-space:nowrap}
+table.freq tfoot td{font-weight:600;border-top:1px solid var(--line)}
+table.freq .bar{display:inline-block;height:8px;background:var(--accent);border-radius:2px;vertical-align:middle;margin-left:6px;opacity:.7}
 
 /* navegación inferior */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--sheet);border-top:1px solid var(--line);display:flex;
@@ -115,15 +149,40 @@ nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-selected=true]{color:var(--accent);background:var(--accent-soft)}
 
 /* hojas modales */
-.sheet{position:fixed;inset:0;background:rgba(10,20,17,.45);display:flex;align-items:flex-end;justify-content:center;z-index:10;padding:0}
-.sheet .card{background:var(--sheet);width:100%;max-width:560px;border-radius:16px 16px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:12px;max-height:88vh;overflow:auto}
+.sheet{position:fixed;inset:0;background:rgba(10,20,17,.45);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+.sheet .card{background:var(--sheet);width:100%;max-width:580px;border-radius:16px 16px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:12px;max-height:90vh;overflow:auto}
 @media (min-width:640px){.sheet{align-items:center}.sheet .card{border-radius:16px}}
 .sheet h3{margin:0;font-family:var(--display);font-weight:600;font-size:1.15rem}
-.sheet textarea{min-height:160px;font-family:var(--mono);font-size:.85rem;width:100%}
+.sheet textarea{min-height:150px;font-family:var(--mono);font-size:.85rem;width:100%}
+.sheet input[type=text]{width:100%}
 .sheet img{border:1px solid var(--line);border-radius:8px;background:var(--sheet)}
 .sheet .actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--sheet);padding:9px 16px;border-radius:999px;font-size:.88rem;z-index:20}
-@media (min-width:980px){.toast{bottom:24px}}
+.sheet .field{display:flex;flex-direction:column;gap:5px}
+.sheet .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sheet .err{color:var(--danger);font-size:.86rem;margin:0}
+.sheet .ok{color:var(--accent);font-size:.86rem;margin:0;font-family:var(--mono)}
+.examples{display:flex;flex-wrap:wrap;gap:6px}
+.examples button{font-family:var(--mono);font-size:.8rem;border:1px dashed var(--line);background:var(--paper);border-radius:6px;padding:4px 8px}
+details.help summary{cursor:pointer;color:var(--accent);font-size:.88rem}
+details.help ul{margin:8px 0 0;padding-left:18px;font-size:.86rem;color:var(--muted)}
+details.help code{font-family:var(--mono);color:var(--ink)}
+.tpls{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.tpls button{border:1px solid var(--line);background:var(--sheet);border-radius:10px;padding:12px;text-align:left;display:flex;flex-direction:column;gap:3px}
+.tpls button:hover{border-color:var(--accent)}
+.tpls b{font-weight:600}
+.tpls small{color:var(--muted);font-size:.8rem;line-height:1.3}
+.colorlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.colorlist label{display:flex;align-items:center;gap:8px;font-size:.88rem;min-width:0}
+.colorlist label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--sheet);padding:6px 12px;font-size:.88rem}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--sheet)}
+.preview{overflow:auto;max-height:180px;border:1px solid var(--line);border-radius:8px;font-size:.8rem}
+.preview table{border-collapse:collapse}
+.preview td{padding:4px 8px;border-bottom:1px solid var(--grid);white-space:nowrap;font-family:var(--mono)}
+.preview tr:first-child td{font-weight:600;background:var(--paper)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--sheet);padding:9px 16px;border-radius:999px;font-size:.88rem;z-index:20;max-width:calc(100% - 32px);text-align:center}
+@media (min-width:1000px){.toast{bottom:24px}}
 @media (prefers-reduced-motion:no-preference){.sheet .card{animation:up .2s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
 </style>
 </head>
@@ -133,7 +192,7 @@ nav.tabs button[aria-selected=true]{color:var(--accent);background:var(--accent-
   <header class="top">
     <div class="brand">
       <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="7" fill="var(--accent)"/><rect x="8" y="17" width="4" height="8" rx="1" fill="var(--sheet)"/><rect x="14" y="11" width="4" height="14" rx="1" fill="var(--sheet)"/><rect x="20" y="7" width="4" height="18" rx="1" fill="var(--amber)"/></svg>
-      Gráficalo
+      <span>Gráficalo</span>
     </div>
     <div class="project">
       <select id="projectSel" aria-label="Proyecto"></select>
@@ -145,39 +204,60 @@ nav.tabs button[aria-selected=true]{color:var(--accent);background:var(--accent-
   <main class="views">
     <section class="view" id="view-data">
       <div class="vhead"><h2>Datos</h2><span class="badge" id="rowCount">0 filas</span></div>
-      <div class="series-names">
-        <label for="nameA">Serie A<input type="text" id="nameA"></label>
-        <label for="nameB">Serie B (opcional)<input type="text" id="nameB" placeholder="Déjala vacía si no la usas"></label>
-      </div>
-      <div class="tablewrap">
-        <table class="data">
-          <thead><tr><th>#</th><th>Etiqueta</th><th id="thA">A</th><th id="thB">B</th><th></th></tr></thead>
-          <tbody id="tbody"></tbody>
-        </table>
+      <div class="tablewrap" id="tablewrap">
+        <table class="data"><thead id="thead"></thead><tbody id="tbody"></tbody></table>
       </div>
       <div class="row-actions">
-        <button class="btn primary" id="addRow">＋ Añadir fila</button>
-        <button class="btn" id="pasteBtn">Pegar datos</button>
-        <label class="btn" for="csvFile">Importar CSV<input type="file" id="csvFile" accept=".csv,.txt,text/csv" hidden></label>
+        <button class="btn primary" id="addRow">＋ Fila</button>
+        <button class="btn" id="addCol">＋ Columna</button>
+        <button class="btn" id="pasteBtn">Pegar</button>
+        <label class="btn" for="fileIn">Importar<input type="file" id="fileIn" accept=".csv,.txt,.tsv,.xlsx,.xls,.ods,text/csv" hidden></label>
       </div>
-      <p class="hint">Puedes escribir decimales con coma o con punto. Para dispersión y regresión, A es el eje X y B el eje Y.</p>
+      <p class="hint">Toca el nombre de una columna para cambiarlo, darle un color o convertirla en una fórmula. Decimales con coma o con punto.</p>
     </section>
 
     <section class="view" id="view-chart" hidden>
-      <div class="vhead"><h2 id="chartTitle">Gráfico</h2><button class="btn" id="exportBtn">Guardar imagen</button></div>
-      <div class="types" role="group" aria-label="Tipo de gráfico" id="types"></div>
-      <div class="chartbox"><canvas id="chart" aria-label="Gráfico de los datos" role="img"></canvas></div>
+      <div class="vhead"><h2 id="chartTitle">Gráfico</h2>
+        <div class="grp"><button class="btn small" id="customBtn">Personalizar</button><button class="btn small" id="exportBtn">Guardar imagen</button></div></div>
+      <div class="chips" role="group" aria-label="Tipo de gráfico" id="types"></div>
+      <div id="seriesRow"><div class="label" style="margin-bottom:6px">Series</div><div class="chips series" id="seriesChips"></div></div>
+      <div class="sel-row" id="xyRow" hidden>
+        <label>X <select id="chartX"></select></label>
+        <label>Y <select id="chartY"></select></label>
+        <label>Ajuste <select id="chartModel"></select></label>
+      </div>
+      <div class="chartbox"><canvas id="chart" role="img" aria-label="Gráfico de los datos"></canvas><div class="empty" id="chartEmpty" hidden></div></div>
       <div class="opts" id="opts">
-        <label><input type="checkbox" id="optMean"> Línea de la media</label>
-        <label><input type="checkbox" id="optValues"> Mostrar valores</label>
-        <label id="binsWrap" hidden>Intervalos <input type="number" id="optBins" min="2" max="30" value="6"></label>
+        <label id="optMeanW"><input type="checkbox" id="optMean"> Línea de la media</label>
+        <label id="optValuesW"><input type="checkbox" id="optValues"> Mostrar valores</label>
+        <label id="binsWrap" hidden>Intervalos <input type="number" id="optBins" min="2" max="40" placeholder="auto"></label>
       </div>
     </section>
 
     <section class="view" id="view-stats" hidden>
-      <div class="vhead"><h2>Estadísticas</h2><button class="btn" id="copyStats">Copiar</button></div>
+      <div class="vhead"><h2>Estadísticas</h2><button class="btn small" id="copyStats">Copiar todo</button></div>
       <p class="explain" id="explain" hidden></p>
-      <div class="stat-groups" id="statGroups"></div>
+
+      <div class="sblock">
+        <div class="vhead"><h3>Resumen</h3><div class="sel-row"><label>Serie <select id="sumCol"></select></label></div></div>
+        <div id="summary"></div>
+      </div>
+
+      <div class="sblock">
+        <div class="vhead"><h3>Tabla de frecuencias</h3>
+          <div class="sel-row"><label>Serie <select id="freqCol"></select></label><label>Intervalos <input type="number" id="freqBins" min="2" max="40" placeholder="auto" style="width:72px;padding:6px 8px"></label><button class="btn small" id="copyFreq">Copiar</button></div></div>
+        <div id="freq"></div>
+      </div>
+
+      <div class="sblock">
+        <div class="vhead"><h3>Relación entre dos series</h3><button class="btn small" id="toScatter">Ver en el gráfico</button></div>
+        <div class="sel-row">
+          <label>X <select id="regX"></select></label>
+          <label>Y <select id="regY"></select></label>
+          <label>Modelo <select id="regModel"></select></label>
+        </div>
+        <div id="reg"></div>
+      </div>
     </section>
   </main>
 
@@ -188,431 +268,12 @@ nav.tabs button[aria-selected=true]{color:var(--accent);background:var(--accent-
   </nav>
 </div>
 
-<div class="sheet" id="sheet" hidden><div class="card" id="sheetCard"></div></div>
+<div class="sheet" id="sheet" hidden><div class="card" id="sheetCard" role="dialog" aria-modal="true"></div></div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="chart.umd.js"></script>
-<script>
-"use strict";
-/* ---------- utilidades numéricas ---------- */
-const parseNum = s => {
-  if (s === null || s === undefined) return NaN;
-  let t = String(s).trim().replace(/\s/g, "").replace(/[€$%]/g, "");
-  if (!t) return NaN;
-  if (t.includes(",") && t.includes(".")) t = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
-  else t = t.replace(",", ".");
-  const n = Number(t); return Number.isFinite(n) ? n : NaN;
-};
-const fmt = (n, d = 2) => Number.isFinite(n) ? n.toLocaleString("es-ES", { maximumFractionDigits: d }) : "—";
-
-const Stats = {
-  sum: a => a.reduce((s, x) => s + x, 0),
-  mean: a => a.length ? Stats.sum(a) / a.length : NaN,
-  sorted: a => [...a].sort((x, y) => x - y),
-  quantile(a, p) { // método lineal (igual que Excel CUARTIL.INC)
-    if (!a.length) return NaN; const s = Stats.sorted(a), i = (s.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i);
-    return s[lo] + (s[hi] - s[lo]) * (i - lo);
-  },
-  median: a => Stats.quantile(a, .5),
-  mode(a) {
-    const c = new Map(); a.forEach(x => c.set(x, (c.get(x) || 0) + 1));
-    const max = Math.max(0, ...c.values()); if (max < 2) return [];
-    return [...c].filter(([, v]) => v === max).map(([k]) => k).sort((x, y) => x - y);
-  },
-  variance(a) { if (a.length < 2) return NaN; const m = Stats.mean(a); return Stats.sum(a.map(x => (x - m) ** 2)) / (a.length - 1); },
-  sd: a => Math.sqrt(Stats.variance(a)),
-  describe(a) {
-    const q1 = Stats.quantile(a, .25), q3 = Stats.quantile(a, .75), iqr = q3 - q1, mean = Stats.mean(a), sd = Stats.sd(a);
-    const lo = q1 - 1.5 * iqr, hi = q3 + 1.5 * iqr;
-    return { n: a.length, sum: Stats.sum(a), mean, median: Stats.median(a), mode: Stats.mode(a),
-      min: a.length ? Math.min(...a) : NaN, max: a.length ? Math.max(...a) : NaN, sd, variance: Stats.variance(a),
-      q1, q3, iqr, cv: mean ? sd / Math.abs(mean) * 100 : NaN, outliers: a.filter(x => x < lo || x > hi) };
-  },
-  regression(xs, ys) {
-    const n = xs.length; if (n < 2) return null;
-    const mx = Stats.mean(xs), my = Stats.mean(ys);
-    let sxy = 0, sxx = 0, syy = 0;
-    for (let i = 0; i < n; i++) { const dx = xs[i] - mx, dy = ys[i] - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
-    if (!sxx) return null;
-    const b = sxy / sxx, a = my - b * mx, r = syy ? sxy / Math.sqrt(sxx * syy) : NaN;
-    return { a, b, r, r2: r * r, n };
-  }
-};
-
-/* ---------- almacenamiento ---------- */
-const KEY = "graficalo.v1";
-const store = {
-  load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } },
-  save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} }
-};
-const uid = () => Math.random().toString(36).slice(2, 9);
-const samples = () => [
-  { id: uid(), name: "Notas de clase (ejemplo)", type: "bar", nameA: "1ª evaluación", nameB: "2ª evaluación", showMean: true, showValues: false, bins: 5,
-    rows: [["Ana","6,5","7,2"],["Bruno","8","8,4"],["Carla","4,5","5,8"],["David","7","6,9"],["Elena","9,2","9,5"],["Fran","5,5","6,1"],["Gema","6","7,4"],["Hugo","3,8","5"]] },
-  { id: uid(), name: "Gastos del mes (ejemplo)", type: "pie", nameA: "Euros", nameB: "", showMean: false, showValues: true, bins: 5,
-    rows: [["Alquiler","550",""],["Comida","240",""],["Transporte","60",""],["Ocio","95",""],["Facturas","110",""],["Otros","45",""]] },
-  { id: uid(), name: "Horas de estudio y nota (ejemplo)", type: "scatter", nameA: "Horas de estudio", nameB: "Nota", showMean: false, showValues: false, bins: 5,
-    rows: [["","2","4,1"],["","4","5,3"],["","5","6,2"],["","7","6,8"],["","8","7,9"],["","10","8,2"],["","3","5"],["","6","6,1"],["","9","8,8"],["","1","3,2"]] }
-];
-let state = store.load();
-if (!state || !Array.isArray(state.projects) || !state.projects.length) state = { projects: samples(), current: null };
-if (!state.projects.find(p => p.id === state.current)) state.current = state.projects[0].id;
-const cur = () => state.projects.find(p => p.id === state.current);
-let saveTimer; const persist = () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => store.save(state), 250); };
-
-/* ---------- datos derivados ---------- */
-function derived(p) {
-  const hasB = !!p.nameB.trim() || p.rows.some(r => String(r[2] ?? "").trim() !== "");
-  const A = [], B = [], labels = [], pairs = [];
-  p.rows.forEach((r, i) => {
-    const a = parseNum(r[1]), b = parseNum(r[2]);
-    const lab = String(r[0] || "").trim() || `#${i + 1}`;
-    if (Number.isFinite(a) || Number.isFinite(b)) labels.push(lab);
-    if (Number.isFinite(a)) A.push(a);
-    if (Number.isFinite(b)) B.push(b);
-    if (Number.isFinite(a) && Number.isFinite(b)) pairs.push([a, b]);
-  });
-  const rowsA = p.rows.map((r, i) => ({ label: String(r[0] || "").trim() || `#${i + 1}`, a: parseNum(r[1]), b: parseNum(r[2]) }))
-                .filter(o => Number.isFinite(o.a) || Number.isFinite(o.b));
-  return { hasB, A, B, pairs, rows: rowsA };
-}
-
-/* ---------- interfaz: proyectos ---------- */
-const $ = s => document.querySelector(s);
-function renderProjects() {
-  $("#projectSel").innerHTML = state.projects.map(p => `<option value="${p.id}" ${p.id === state.current ? "selected" : ""}>${esc(p.name)}</option>`).join("");
-}
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-$("#projectSel").addEventListener("change", e => { state.current = e.target.value; persist(); renderAll(); });
-$("#newProject").addEventListener("click", () => {
-  const p = { id: uid(), name: "Proyecto " + (state.projects.length + 1), type: "bar", nameA: "Valor", nameB: "", showMean: false, showValues: false, bins: 6, rows: [["", "", ""], ["", "", ""], ["", "", ""]] };
-  state.projects.push(p); state.current = p.id; persist(); renderAll(); showView("view-data");
-  setTimeout(() => $("#tbody input")?.focus(), 50);
-});
-$("#projectMenu").addEventListener("click", () => {
-  const p = cur();
-  openSheet(`<h3>Proyecto</h3>
-    <label for="renameIn" class="hint">Nombre</label>
-    <input type="text" id="renameIn" value="${esc(p.name)}">
-    <div class="actions">
-      <button class="btn" data-act="dup">Duplicar</button>
-      <button class="btn" data-act="csv">Copiar como CSV</button>
-      <button class="btn danger" data-act="del">Borrar…</button>
-      <button class="btn primary" data-act="ok">Guardar</button>
-    </div>
-    <div id="confirmDel" hidden class="explain">¿Borrar «${esc(p.name)}» y todos sus datos? Esto no se puede deshacer.
-      <div class="actions" style="margin-top:8px"><button class="btn" data-act="cancel">Cancelar</button><button class="btn danger" data-act="del2">Sí, borrar</button></div></div>`,
-  act => {
-    if (act === "ok") { p.name = $("#renameIn").value.trim() || p.name; persist(); renderProjects(); renderChartTitle(); closeSheet(); }
-    if (act === "dup") { const c = JSON.parse(JSON.stringify(p)); c.id = uid(); c.name = p.name + " (copia)"; state.projects.push(c); state.current = c.id; persist(); renderAll(); closeSheet(); toast("Proyecto duplicado"); }
-    if (act === "csv") { copyText(toCSV(p)).then(ok => toast(ok ? "CSV copiado" : "No se pudo copiar")); }
-    if (act === "del") $("#confirmDel").hidden = false;
-    if (act === "cancel") $("#confirmDel").hidden = true;
-    if (act === "del2") {
-      state.projects = state.projects.filter(x => x.id !== p.id);
-      if (!state.projects.length) state.projects = samples();
-      state.current = state.projects[0].id; persist(); renderAll(); closeSheet(); toast("Proyecto borrado");
-    }
-  });
-});
-
-/* ---------- interfaz: tabla ---------- */
-function renderTable() {
-  const p = cur();
-  $("#nameA").value = p.nameA; $("#nameB").value = p.nameB;
-  $("#thA").textContent = p.nameA || "A"; $("#thB").textContent = p.nameB || "B";
-  $("#tbody").innerHTML = p.rows.map((r, i) => `<tr data-i="${i}">
-    <td>${i + 1}</td>
-    <td><input type="text" id="c${i}_0" data-c="0" value="${esc(r[0] ?? "")}" aria-label="Etiqueta fila ${i + 1}"></td>
-    <td><input type="text" inputmode="decimal" class="num" id="c${i}_1" data-c="1" value="${esc(r[1] ?? "")}" aria-label="Serie A fila ${i + 1}"></td>
-    <td><input type="text" inputmode="decimal" class="num" id="c${i}_2" data-c="2" value="${esc(r[2] ?? "")}" aria-label="Serie B fila ${i + 1}"></td>
-    <td><button class="del" data-del="${i}" aria-label="Borrar fila ${i + 1}">×</button></td></tr>`).join("");
-  updateCount();
-}
-function updateCount() { const n = derived(cur()).rows.length; $("#rowCount").textContent = `${n} ${n === 1 ? "fila" : "filas"} con datos`; }
-$("#tbody").addEventListener("input", e => {
-  const tr = e.target.closest("tr"); if (!tr) return;
-  cur().rows[+tr.dataset.i][+e.target.dataset.c] = e.target.value;
-  persist(); updateCount(); scheduleRefresh();
-});
-$("#tbody").addEventListener("keydown", e => {
-  if (e.key !== "Enter") return;
-  const tr = e.target.closest("tr"), i = +tr.dataset.i, c = e.target.dataset.c;
-  e.preventDefault();
-  if (i === cur().rows.length - 1) { cur().rows.push(["", "", ""]); renderTable(); }
-  document.getElementById(`c${i + 1}_${c}`)?.focus();
-});
-$("#tbody").addEventListener("click", e => {
-  const d = e.target.closest("[data-del]"); if (!d) return;
-  cur().rows.splice(+d.dataset.del, 1); if (!cur().rows.length) cur().rows.push(["", "", ""]);
-  persist(); renderTable(); refresh();
-});
-$("#addRow").addEventListener("click", () => {
-  cur().rows.push(["", "", ""]); persist(); renderTable();
-  document.getElementById(`c${cur().rows.length - 1}_0`)?.focus();
-});
-["nameA", "nameB"].forEach(k => $("#" + k).addEventListener("input", e => {
-  cur()[k] = e.target.value; $("#thA").textContent = cur().nameA || "A"; $("#thB").textContent = cur().nameB || "B";
-  persist(); scheduleRefresh();
-}));
-
-/* ---------- importar ---------- */
-function parseTable(text) {
-  const lines = text.replace(/\r/g, "").split("\n").filter(l => l.trim());
-  if (!lines.length) return null;
-  const sep = ["\t", ";", ","].find(s => lines[0].includes(s)) || "\t";
-  const split = l => { // separa respetando comillas
-    const out = []; let cell = "", q = false;
-    for (const ch of l) { if (ch === '"') q = !q; else if (ch === sep && !q) { out.push(cell); cell = ""; } else cell += ch; }
-    out.push(cell); return out.map(c => c.trim());
-  };
-  let rows = lines.map(split);
-  // si sólo hay una columna con números, la tratamos como valores
-  if (rows.every(r => r.length === 1)) rows = rows.map(r => ["", r[0], ""]);
-  else if (rows.every(r => r.length >= 2 && Number.isFinite(parseNum(r[0])) && Number.isFinite(parseNum(r[1])) && (r.length === 2)))
-    rows = rows.map(r => ["", r[0], r[1]]); // dos columnas numéricas = X, Y
-  let header = null;
-  if (rows.length > 1 && !Number.isFinite(parseNum(rows[0][1])) ) header = rows.shift();
-  return { header, rows: rows.map(r => [r[0] ?? "", r[1] ?? "", r[2] ?? ""]) };
-}
-function applyImport(text, name) {
-  const t = parseTable(text);
-  if (!t || !t.rows.length) { toast("No he encontrado datos en ese texto"); return false; }
-  const p = cur(); p.rows = t.rows;
-  if (t.header) { if (t.header[1]) p.nameA = t.header[1]; p.nameB = t.header[2] || ""; }
-  if (name && /^Proyecto \d+$/.test(p.name)) p.name = name.replace(/\.[^.]+$/, "");
-  persist(); renderAll(); toast(`${t.rows.length} filas importadas`); return true;
-}
-$("#pasteBtn").addEventListener("click", () => {
-  openSheet(`<h3>Pegar datos</h3>
-    <p class="hint">Copia celdas desde Excel, Google Sheets o un CSV y pégalas aquí. Columnas: etiqueta, valor A y, si quieres, valor B. La primera fila puede ser el encabezado.</p>
-    <textarea id="pasteArea" placeholder="Mes;Ventas;Gastos&#10;Enero;1200;800&#10;Febrero;1350;820"></textarea>
-    <p class="hint">Se reemplazan los datos del proyecto actual.</p>
-    <div class="actions"><button class="btn ghost" data-act="close">Cancelar</button><button class="btn primary" data-act="ok">Importar</button></div>`,
-  act => { if (act === "ok" && applyImport($("#pasteArea").value)) closeSheet(); if (act === "close") closeSheet(); });
-  setTimeout(() => $("#pasteArea").focus(), 50);
-});
-$("#csvFile").addEventListener("change", e => {
-  const f = e.target.files[0]; if (!f) return;
-  const rd = new FileReader(); rd.onload = () => applyImport(String(rd.result), f.name); rd.readAsText(f); e.target.value = "";
-});
-const toCSV = p => [["Etiqueta", p.nameA || "A", p.nameB || "B"], ...p.rows].map(r => r.map(c => /[;"\n]/.test(c ?? "") ? `"${String(c).replace(/"/g, '""')}"` : (c ?? "")).join(";")).join("\n");
-
-/* ---------- gráfico ---------- */
-const TYPES = [
-  { id: "bar", name: "Barras", icon: '<path d="M4 20V11M10 20V5M16 20v-8M21 20H3"/>' },
-  { id: "line", name: "Líneas", icon: '<path d="M3 17l5-6 4 3 8-9"/>' },
-  { id: "pie", name: "Sectores", icon: '<circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 5"/>' },
-  { id: "scatter", name: "Dispersión", icon: '<circle cx="6" cy="16" r="1.6"/><circle cx="11" cy="11" r="1.6"/><circle cx="15" cy="13" r="1.6"/><circle cx="18" cy="6" r="1.6"/>' },
-  { id: "hist", name: "Histograma", icon: '<path d="M3 20h18M5 20v-6h4v6M9 20V8h4v12M13 20v-9h4v9M17 20v-4h3"/>' },
-];
-$("#types").innerHTML = TYPES.map(t => `<button data-type="${t.id}" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">${t.icon}</svg>${t.name}</button>`).join("");
-$("#types").addEventListener("click", e => { const b = e.target.closest("[data-type]"); if (!b) return; cur().type = b.dataset.type; persist(); refresh(); });
-$("#optMean").addEventListener("change", e => { cur().showMean = e.target.checked; persist(); refresh(); });
-$("#optValues").addEventListener("change", e => { cur().showValues = e.target.checked; persist(); refresh(); });
-$("#optBins").addEventListener("input", e => { const v = Math.max(2, Math.min(30, +e.target.value || 6)); cur().bins = v; persist(); scheduleRefresh(); });
-
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const PALETTE = () => [css("--accent"), css("--amber"), "#5b7fd6", "#c4527a", "#6b9e3a", "#8a63c9", "#d07a4a", "#3a9bb0"];
-const alpha = (hex, a) => { const m = hex.replace("#", ""); const n = parseInt(m.length === 3 ? m.split("").map(c => c + c).join("") : m, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
-
-// plugin: dibuja valores encima de las marcas
-const valueLabels = {
-  id: "valueLabels",
-  afterDatasetsDraw(chart, _a, opts) {
-    if (!opts.show) return;
-    const { ctx } = chart; ctx.save(); ctx.font = "500 11px " + css("--mono"); ctx.fillStyle = css("--ink"); ctx.textAlign = "center";
-    chart.data.datasets.forEach((ds, di) => {
-      if (ds._noLabels) return;
-      chart.getDatasetMeta(di).data.forEach((el, i) => {
-        const v = ds.data[i]; if (v == null || typeof v === "object") return;
-        if (chart.config.type === "pie") {
-          const tot = ds.data.reduce((s, x) => s + (x || 0), 0); const pos = el.tooltipPosition();
-          ctx.fillStyle = "#fff"; ctx.fillText(fmt(v / tot * 100, 0) + " %", pos.x, pos.y + 4); ctx.fillStyle = css("--ink");
-        } else ctx.fillText(fmt(v), el.x, el.y - 6);
-      });
-    });
-    ctx.restore();
-  }
-};
-Chart.register(valueLabels);
-
-let chart;
-function buildConfig(p, d) {
-  const ink = css("--ink"), muted = css("--muted"), grid = css("--grid"), pal = PALETTE();
-  const base = {
-    responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
-    plugins: { legend: { labels: { color: ink, font: { family: css("--body") }, boxWidth: 12 } },
-      tooltip: { callbacks: {} }, valueLabels: { show: p.showValues } },
-    scales: {
-      x: { ticks: { color: muted, font: { family: css("--body") } }, grid: { color: grid } },
-      y: { ticks: { color: muted, font: { family: css("--mono") } }, grid: { color: grid }, beginAtZero: true }
-    }
-  };
-  const labels = d.rows.map(r => r.label);
-  const sA = d.rows.map(r => Number.isFinite(r.a) ? r.a : null), sB = d.rows.map(r => Number.isFinite(r.b) ? r.b : null);
-  const meanLine = (vals, color, name) => ({ type: "line", label: `Media ${name}`, data: labels.map(() => Stats.mean(vals)), borderColor: color, borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, fill: false, _noLabels: true });
-
-  if (p.type === "bar" || p.type === "line") {
-    const ds = [{ label: p.nameA || "A", data: sA, backgroundColor: p.type === "bar" ? pal[0] : alpha(pal[0], .12), borderColor: pal[0], borderWidth: 2, borderRadius: 4, tension: .25, fill: p.type === "line", pointRadius: 3.5 }];
-    if (d.hasB) ds.push({ label: p.nameB || "B", data: sB, backgroundColor: p.type === "bar" ? pal[1] : alpha(pal[1], .08), borderColor: pal[1], borderWidth: 2, borderRadius: 4, tension: .25, fill: false, pointRadius: 3.5 });
-    if (p.showMean) { ds.push(meanLine(d.A, pal[0], p.nameA || "A")); if (d.hasB && d.B.length) ds.push(meanLine(d.B, pal[1], p.nameB || "B")); }
-    base.plugins.legend.display = ds.length > 1;
-    return { type: p.type, data: { labels, datasets: ds }, options: base };
-  }
-  if (p.type === "pie") {
-    const items = d.rows.filter(r => Number.isFinite(r.a) && r.a > 0);
-    delete base.scales;
-    base.plugins.legend.position = "bottom";
-    base.plugins.tooltip.callbacks.label = c => { const t = c.dataset.data.reduce((s, x) => s + x, 0); return ` ${c.label}: ${fmt(c.raw)} (${fmt(c.raw / t * 100, 1)} %)`; };
-    return { type: "pie", data: { labels: items.map(r => r.label), datasets: [{ data: items.map(r => r.a), backgroundColor: items.map((_, i) => pal[i % pal.length]), borderColor: css("--sheet"), borderWidth: 2 }] }, options: base };
-  }
-  if (p.type === "scatter") {
-    const pts = d.pairs.map(([x, y]) => ({ x, y }));
-    const ds = [{ label: `${p.nameB || "B"} según ${p.nameA || "A"}`, data: pts, backgroundColor: pal[0], pointRadius: 5, _noLabels: true }];
-    const reg = Stats.regression(d.pairs.map(q => q[0]), d.pairs.map(q => q[1]));
-    if (reg) {
-      const xs = d.pairs.map(q => q[0]), x0 = Math.min(...xs), x1 = Math.max(...xs);
-      ds.push({ type: "line", label: `Recta de regresión (R² = ${fmt(reg.r2, 3)})`, data: [{ x: x0, y: reg.a + reg.b * x0 }, { x: x1, y: reg.a + reg.b * x1 }], borderColor: pal[1], borderWidth: 2, pointRadius: 0, _noLabels: true });
-    }
-    base.scales.x.type = "linear"; base.scales.y.beginAtZero = false;
-    base.scales.x.title = { display: true, text: p.nameA || "A", color: muted };
-    base.scales.y.title = { display: true, text: p.nameB || "B", color: muted };
-    base.plugins.tooltip.callbacks.label = c => ` (${fmt(c.raw.x)}, ${fmt(c.raw.y)})`;
-    return { type: "scatter", data: { datasets: ds }, options: base };
-  }
-  // histograma de la serie A
-  const vals = d.A, k = p.bins || 6;
-  const mn = Math.min(...vals), mx = Math.max(...vals), w = (mx - mn) / k || 1;
-  const counts = Array(k).fill(0); vals.forEach(v => counts[Math.min(k - 1, Math.floor((v - mn) / w))]++);
-  const labs = counts.map((_, i) => `${fmt(mn + i * w, 1)}–${fmt(mn + (i + 1) * w, 1)}`);
-  base.plugins.legend.display = false;
-  base.scales.x.grid.display = false;
-  base.scales.y.ticks.precision = 0;
-  base.scales.y.title = { display: true, text: "Frecuencia", color: muted };
-  return { type: "bar", data: { labels: labs, datasets: [{ label: "Frecuencia", data: counts, backgroundColor: pal[0], borderColor: css("--sheet"), borderWidth: 1, barPercentage: 1, categoryPercentage: 1 }] }, options: base };
-}
-function renderChartTitle() { $("#chartTitle").textContent = cur().name; }
-function renderChart() {
-  const p = cur(), d = derived(p);
-  document.querySelectorAll("#types [data-type]").forEach(b => b.setAttribute("aria-pressed", b.dataset.type === p.type));
-  $("#optMean").checked = !!p.showMean; $("#optValues").checked = !!p.showValues; $("#optBins").value = p.bins || 6;
-  $("#binsWrap").hidden = p.type !== "hist";
-  $("#optMean").parentElement.hidden = !(p.type === "bar" || p.type === "line");
-  $("#optValues").parentElement.hidden = p.type === "scatter" || p.type === "hist";
-  renderChartTitle();
-  if (chart) chart.destroy();
-  const ok = p.type === "scatter" ? d.pairs.length >= 1 : d.A.length >= 1;
-  if (!ok) { chart = null; const c = $("#chart"), ctx = c.getContext("2d"); ctx.clearRect(0, 0, c.width, c.height);
-    ctx.fillStyle = css("--muted"); ctx.font = "14px " + css("--body"); ctx.textAlign = "center";
-    ctx.fillText(p.type === "scatter" ? "Rellena las series A y B para ver la dispersión" : "Añade valores en la serie A", c.width / 2 / devicePixelRatio, 40); return; }
-  chart = new Chart($("#chart"), buildConfig(p, d));
-}
-
-/* ---------- estadísticas ---------- */
-const EXPLAIN = {
-  "Media": "La suma de todos los valores dividida entre cuántos hay.",
-  "Mediana": "El valor que queda en el centro al ordenarlos. Le afectan poco los valores extremos.",
-  "Moda": "El valor que más se repite.",
-  "Desviación típica": "Cuánto se separan los datos de la media, de promedio. Cuanto mayor, más dispersos.",
-  "Varianza": "La desviación típica al cuadrado.",
-  "Q1 / Q3": "El 25 % de los datos está por debajo de Q1 y el 75 % por debajo de Q3.",
-  "Rango intercuartílico": "Q3 − Q1: el ancho de la mitad central de los datos.",
-  "Coef. de variación": "La desviación típica en porcentaje de la media. Sirve para comparar dispersión entre series distintas.",
-  "Valores atípicos": "Datos que se alejan mucho del resto (más de 1,5 veces el rango intercuartílico fuera de Q1–Q3).",
-  "Correlación (r)": "De −1 a 1. Cerca de 1: cuando A sube, B sube. Cerca de −1: cuando A sube, B baja. Cerca de 0: no hay relación lineal.",
-  "R²": "Qué parte de la variación de B explica la recta. 1 = la explica entera.",
-  "Recta": "La línea que mejor se ajusta a los puntos. Sirve para estimar B a partir de A."
-};
-let lastStatsText = "";
-function statBlock(title, color, s) {
-  const rows = [
-    ["Datos (n)", fmt(s.n, 0)], ["Suma", fmt(s.sum)], ["Media", fmt(s.mean)], ["Mediana", fmt(s.median)],
-    ["Moda", s.mode.length ? s.mode.slice(0, 3).map(x => fmt(x)).join(" · ") + (s.mode.length > 3 ? "…" : "") : "Sin moda"],
-    ["Mínimo", fmt(s.min)], ["Máximo", fmt(s.max)], ["Rango", fmt(s.max - s.min)],
-    ["Desviación típica", fmt(s.sd)], ["Varianza", fmt(s.variance)],
-    ["Q1 / Q3", `${fmt(s.q1)} / ${fmt(s.q3)}`], ["Rango intercuartílico", fmt(s.iqr)],
-    ["Coef. de variación", Number.isFinite(s.cv) ? fmt(s.cv, 1) + " %" : "—"],
-    ["Valores atípicos", s.outliers.length ? `<span class="warn">${s.outliers.map(x => fmt(x)).join(" · ")}</span>` : "Ninguno"]
-  ];
-  lastStatsText += `\n${title}\n` + rows.map(([k, v]) => `${k}: ${String(v).replace(/<[^>]+>/g, "")}`).join("\n") + "\n";
-  return `<div class="sgroup"><h3><i style="background:${color}"></i>${esc(title)}</h3><dl class="stats">${rows.map(([k, v]) =>
-    `<dt>${k}${EXPLAIN[k] ? `<button class="info" data-k="${k}" aria-label="Qué es ${k}">ⓘ</button>` : ""}</dt><dd>${v}</dd>`).join("")}</dl></div>`;
-}
-function renderStats() {
-  const p = cur(), d = derived(p), pal = PALETTE();
-  lastStatsText = p.name + "\n";
-  let html = "";
-  if (d.A.length) html += statBlock(p.nameA || "Serie A", pal[0], Stats.describe(d.A));
-  if (d.hasB && d.B.length) html += statBlock(p.nameB || "Serie B", pal[1], Stats.describe(d.B));
-  const reg = d.pairs.length >= 3 ? Stats.regression(d.pairs.map(q => q[0]), d.pairs.map(q => q[1])) : null;
-  if (reg) {
-    const strength = Math.abs(reg.r) >= .7 ? "fuerte" : Math.abs(reg.r) >= .4 ? "moderada" : "débil";
-    const dir = reg.r >= 0 ? "positiva" : "negativa";
-    const rows = [["Correlación (r)", fmt(reg.r, 3)], ["Relación", `${strength}, ${dir}`], ["R²", fmt(reg.r2, 3)],
-      ["Recta", `y = ${fmt(reg.a, 3)} ${reg.b < 0 ? "−" : "+"} ${fmt(Math.abs(reg.b), 3)}·x`], ["Pares usados", fmt(reg.n, 0)]];
-    lastStatsText += `\n${p.nameA} vs ${p.nameB}\n` + rows.map(([k, v]) => `${k}: ${v}`).join("\n") + "\n";
-    html += `<div class="sgroup"><h3>${esc(p.nameA || "A")} frente a ${esc(p.nameB || "B")}</h3><dl class="stats">${rows.map(([k, v]) =>
-      `<dt>${k}${EXPLAIN[k] ? `<button class="info" data-k="${k}" aria-label="Qué es ${k}">ⓘ</button>` : ""}</dt><dd>${v}</dd>`).join("")}</dl></div>`;
-  }
-  $("#statGroups").innerHTML = html || `<p class="hint">Añade al menos un número en la serie A para ver las estadísticas.</p>`;
-}
-$("#statGroups").addEventListener("click", e => {
-  const b = e.target.closest(".info"); if (!b) return;
-  const ex = $("#explain"); const txt = `${b.dataset.k}: ${EXPLAIN[b.dataset.k]}`;
-  ex.hidden = ex.textContent === txt ? !ex.hidden : false; ex.textContent = txt;
-});
-$("#copyStats").addEventListener("click", () => copyText(lastStatsText.trim()).then(ok => toast(ok ? "Estadísticas copiadas" : "No se pudo copiar")));
-
-/* ---------- exportar imagen ---------- */
-$("#exportBtn").addEventListener("click", () => {
-  if (!chart) { toast("Primero añade datos"); return; }
-  const src = chart.canvas, pad = 24, titleH = 36;
-  const out = document.createElement("canvas"); out.width = src.width + pad * 2; out.height = src.height + pad * 2 + titleH;
-  const ctx = out.getContext("2d"); ctx.fillStyle = css("--sheet"); ctx.fillRect(0, 0, out.width, out.height);
-  ctx.fillStyle = css("--ink"); ctx.font = `600 ${Math.round(20 * devicePixelRatio)}px ${css("--display")}`; ctx.fillText(cur().name, pad, pad + 22 * devicePixelRatio * .9);
-  ctx.drawImage(src, pad, pad + titleH);
-  const url = out.toDataURL("image/png");
-  const fname = cur().name.replace(/[^\w\- áéíóúñÁÉÍÓÚÑ]/g, "").trim() + ".png";
-  try { const a = document.createElement("a"); a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove(); } catch {}
-  openSheet(`<h3>Imagen del gráfico</h3><img src="${url}" alt="Gráfico ${esc(cur().name)}"><p class="hint">Si no se ha descargado, mantén pulsada la imagen y elige «Guardar imagen».</p><div class="actions"><button class="btn primary" data-act="close">Hecho</button></div>`, a => a === "close" && closeSheet());
-});
-
-/* ---------- hojas, avisos, portapapeles ---------- */
-let sheetHandler = null;
-function openSheet(html, handler) { $("#sheetCard").innerHTML = html; sheetHandler = handler; $("#sheet").hidden = false; }
-function closeSheet() { $("#sheet").hidden = true; sheetHandler = null; }
-$("#sheet").addEventListener("click", e => { if (e.target.id === "sheet") return closeSheet(); const b = e.target.closest("[data-act]"); if (b && sheetHandler) sheetHandler(b.dataset.act); });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#sheet").hidden) closeSheet(); });
-let toastT; function toast(m) { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2200); }
-async function copyText(t) {
-  try { await navigator.clipboard.writeText(t); return true; } catch {
-    try { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); const ok = document.execCommand("copy"); ta.remove(); return ok; } catch { return false; } }
-}
-
-/* ---------- vistas (móvil) ---------- */
-function showView(id) {
-  document.querySelectorAll(".view").forEach(v => v.hidden = v.id !== id);
-  document.querySelectorAll("nav.tabs [data-view]").forEach(b => b.setAttribute("aria-selected", b.dataset.view === id));
-  if (id === "view-chart") renderChart();
-  window.scrollTo(0, 0);
-}
-document.querySelectorAll("nav.tabs [data-view]").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
-
-/* ---------- ciclo ---------- */
-let refreshT; const scheduleRefresh = () => { clearTimeout(refreshT); refreshT = setTimeout(refresh, 200); };
-function refresh() { renderChart(); renderStats(); }
-function renderAll() { renderProjects(); renderTable(); refresh(); }
-matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", refresh);
-new MutationObserver(refresh).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-document.fonts?.ready.then(refresh);
-renderAll();
-
-/* ---------- modo sin conexión (PWA) ---------- */
-if ("serviceWorker" in navigator && location.protocol === "https:" && !/claude|anthropic/.test(location.hostname)) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
-}
-</script>
+<script src="stats.js"></script>
+<script src="app.js"></script>
 
 </body>
 </html>
