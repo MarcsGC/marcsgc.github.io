@@ -883,4 +883,5 @@ I18N.pt = {
 "Últimos {n} días: media {v}, {d} menos que los {n} anteriores.": "Últimos {n} dias: média {v}, {d} a menos que os {n} anteriores.",
 "Últimos {n} días: media {v}, igual que los {n} anteriores.": "Últimos {n} dias: média {v}, igual aos {n} anteriores.",
 "Últimos {n} días: media {v}.": "Últimos {n} dias: média {v}.",
+"No se ha completado la conexión con Google": "A conexão com o Google não foi concluída",
 };

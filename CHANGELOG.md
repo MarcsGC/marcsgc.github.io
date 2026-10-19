@@ -1,5 +1,10 @@
 # Registro de cambios de Gráficalo
 
+## 0.6.1 · 19 de octubre de 2026
+
+### Corregido
+- Si la conexión con Google Drive no se completaba (por ejemplo, porque Google mostraba un error), la app intentaba reconectar sola cada vez que se abría y se quedaba en la página de Google. Ahora se descarta la conexión a medias, se avisa y la app abre con normalidad. Además, si una reconexión automática no vuelve, no se repite en unas horas.
+
 ## 0.6 · 19 de octubre de 2026
 
 ### Nuevo

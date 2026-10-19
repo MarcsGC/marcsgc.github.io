@@ -883,4 +883,5 @@ I18N.it = {
 "Últimos {n} días: media {v}, {d} menos que los {n} anteriores.": "Ultimi {n} giorni: media {v}, {d} in meno dei {n} precedenti.",
 "Últimos {n} días: media {v}, igual que los {n} anteriores.": "Ultimi {n} giorni: media {v}, uguale ai {n} precedenti.",
 "Últimos {n} días: media {v}.": "Ultimi {n} giorni: media {v}.",
+"No se ha completado la conexión con Google": "La connessione a Google non è stata completata",
 };

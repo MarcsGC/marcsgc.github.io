@@ -425,4 +425,5 @@ I18N.en = {
 "Últimos {n} días: media {v}, {d} menos que los {n} anteriores.": "Last {n} days: average {v}, {d} less than the previous {n}.",
 "Últimos {n} días: media {v}, igual que los {n} anteriores.": "Last {n} days: average {v}, same as the previous {n}.",
 "Últimos {n} días: media {v}.": "Last {n} days: average {v}.",
+"No se ha completado la conexión con Google": "The connection to Google wasn't completed",
 };

@@ -883,4 +883,5 @@ I18N.ca = {
 "Últimos {n} días: media {v}, {d} menos que los {n} anteriores.": "Últims {n} dies: mitjana {v}, {d} menys que els {n} anteriors.",
 "Últimos {n} días: media {v}, igual que los {n} anteriores.": "Últims {n} dies: mitjana {v}, igual que els {n} anteriors.",
 "Últimos {n} días: media {v}.": "Últims {n} dies: mitjana {v}.",
+"No se ha completado la conexión con Google": "No s’ha completat la connexió amb Google",
 };

@@ -10,7 +10,8 @@ const GD_TOK = "graficalo.gdtoken", GD_STATE = "graficalo.gdstate";
 const syncState = { busy: false, again: false, status: "off", lastPull: 0, lastFp: "", applying: false };
 
 const gdEnabled = () => !!GDRIVE_CLIENT_ID;
-const syncOn = () => !!(settings.sync && settings.sync.on);
+// conectado de verdad solo si alguna vez volvimos de Google con permiso (ok, correo o una sincronización hecha)
+const syncOn = () => !!(settings.sync && settings.sync.on && (settings.sync.ok || settings.sync.email || settings.sync.lastSync));
 const gdRedirectUri = () => new URL("./", location.href.split("#")[0].split("?")[0]).href;
 function gdToken() { try { const x = JSON.parse(localStorage.getItem(GD_TOK)); return x && x.exp > Date.now() + 60000 ? x.t : null; } catch { return null; } }
 const gdSaveTok = x => { try { localStorage.setItem(GD_TOK, JSON.stringify(x)); } catch {} };
@@ -163,10 +164,17 @@ function gdReachable() {
 async function startupSync() {
   if (!gdEnabled()) return;
   const r = gdHandleRedirect();
+  if (settings.sync) {
+    const sy = settings.sync, triedSilent = sy.silentTry; delete sy.silentTry;
+    if (!r && triedSilent) sy.silentFail = triedSilent; // se fue a Google y volvió sin respuesta: no reintentar en un rato
+    if (!r && sy.pending && !syncOn()) { delete settings.sync; toast(t("No se ha completado la conexión con Google")); } // conexión a medias
+    else if (!r && !syncOn()) delete settings.sync; // estado antiguo a medias (0.5): limpiar
+    saveSettings();
+  }
   if (r?.ok) {
     if (!settings.sync) settings.sync = {};
-    const first = !settings.sync.on || !settings.sync.email;
-    settings.sync.on = true; settings.sync.silentFail = 0; saveSettings();
+    const first = !settings.sync.email;
+    settings.sync.on = true; settings.sync.ok = true; delete settings.sync.pending; settings.sync.silentFail = 0; saveSettings();
     if (first) { settings.sync.email = await gdEmail(); saveSettings(); }
     const n0 = state.projects.length;
     await syncNow();
@@ -174,12 +182,12 @@ async function startupSync() {
   } else if (r?.error) {
     if (r.silent && settings.sync) { settings.sync.silentFail = Date.now(); saveSettings(); setSync("paused"); }
     else {
-      if (settings.sync && !settings.sync.email) { settings.sync.on = false; saveSettings(); }
+      if (settings.sync && !syncOn()) { delete settings.sync; saveSettings(); }
       if (r.error !== "access_denied") toast(t("No se ha podido conectar con Google"));
     }
   } else if (syncOn()) {
     if (gdToken()) syncNow();
-    else if (navigator.onLine && Date.now() - (settings.sync.silentFail || 0) > 6 * 3600e3 && await gdReachable()) gdAuth(true); // reconexión silenciosa
+    else if (navigator.onLine && Date.now() - (settings.sync.silentFail || 0) > 6 * 3600e3 && await gdReachable()) { settings.sync.silentTry = Date.now(); saveSettings(); gdAuth(true); } // reconexión silenciosa
     else setSync("paused");
   }
   document.addEventListener("visibilitychange", () => {
@@ -226,7 +234,7 @@ function syncSheet() {
     act => {
       if (act !== "connect") return;
       if (!navigator.onLine) { toast(t("Necesitas conexión a internet")); return; }
-      settings.sync = Object.assign(settings.sync || {}, { on: true }); saveSettings(); gdAuth(false);
+      settings.sync = Object.assign(settings.sync || {}, { pending: Date.now() }); saveSettings(); gdAuth(false);
     });
     return;
   }
