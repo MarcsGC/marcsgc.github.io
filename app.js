@@ -341,15 +341,17 @@ function showHome() {
 }
 // menú de la pantalla de inicio: lo que no depende de un proyecto
 function homeMenu() {
-  openSheet(`<h3>${t("Menú")}</h3><div class="menu">
+  openSheet(`<h3>${t("Menú")}</h3><div class="menulist">
       ${menuItem("new", IC.plus, t("Nuevo proyecto"))}
       ${typeof gdEnabled === "function" && gdEnabled() ? menuItem("sync", IC.cloud, t("Sincronizar con Google Drive"), syncMenuSub()) : ""}
       ${menuItem("backup", IC.save, t("Guardar copia de seguridad"), t("Todos tus proyectos en un archivo"))}
-      ${menuItem("restore", IC.imp, t("Restaurar copia de seguridad"))}
+      ${menuItem("restore", IC.restore, t("Restaurar copia de seguridad"))}
       ${menuItem("settings", IC.sun, t("Ajustes"), t("Tema, idioma y PIN"))}
-      ${menuItem("grades", IC.help, t("¿Qué nota necesito?"), t("Calcula la nota que te hace falta en el próximo examen"))}
-      ${menuItem("news", IC.info, t("Novedades"))}
-      ${menuItem("feedback", IC.info, t("Enviar sugerencias o errores"))}
+      ${menuItem("grades", '<path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-7"/>', t("¿Qué nota necesito?"), t("Calcula la nota que te hace falta en el próximo examen"))}
+      ${menuItem("news", '<path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.6 7.1 18.2 8 12.7 4 8.8 9.5 8z"/>', t("Novedades"))}
+      ${menuItem("feedback", '<path d="M4 5h16v11H8l-4 4z"/>', t("Enviar sugerencias o errores"))}
+      ${menuItem("rate", '<path d="M12 21s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 11c0 5.6-7 10-7 10z"/>', t("Valorar la app"))}
+      ${menuItem("tutorial", IC.help, t("Ver el tutorial"))}
       ${menuItem("about", IC.info, t("Acerca de Gráficalo"))}
     </div><div class="actions"><button class="btn ghost" data-act="close">${t("Cerrar")}</button></div>`,
   act => {
@@ -361,6 +363,8 @@ function homeMenu() {
     if (act === "grades") gradeSheet();
     if (act === "news") whatsNewSheet(true);
     if (act === "feedback") feedbackSheet();
+    if (act === "rate") rateSheet(true);
+    if (act === "tutorial") { closeSheet(); showOnboarding(); }
     if (act === "about") aboutSheet();
   });
 }

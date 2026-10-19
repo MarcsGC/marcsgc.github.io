@@ -1,5 +1,10 @@
 # Registro de cambios de Gráficalo
 
+## 0.6.2 · 19 de octubre de 2026
+
+### Corregido
+- El menú de la pantalla de proyectos se veía con iconos enormes; ahora tiene el mismo aspecto que el menú de un proyecto, y añade «Valorar la app» y «Ver el tutorial».
+
 ## 0.6.1 · 19 de octubre de 2026
 
 ### Corregido

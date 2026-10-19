@@ -1,6 +1,6 @@
 // Service worker: guarda la app para que funcione sin conexión.
 // Cambia VERSION cada vez que publiques cambios para que los móviles descarguen la versión nueva.
-const VERSION = "graficalo-v0.6.1";
+const VERSION = "graficalo-v0.6.2";
 const CORE = ["./", "index.html", "i18n.js", "stats.js", "app.js", "charts.js", "statsview.js", "export.js", "ocr.js", "extras.js", "sync.js", "main.js", "lang/en.js", "lang/pt.js", "lang/fr.js", "lang/it.js", "lang/de.js", "lang/ca.js",
   "lib/chart.umd.js", "lib/hammer.min.js", "lib/chartjs-plugin-zoom.min.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"];
 // xlsx, jspdf y el lector de fotos se guardan la primera vez que se usan
