@@ -48,7 +48,7 @@ header.top{display:flex;align-items:center;gap:6px;padding-block:4px 14px}
 .homebar .brand span{display:inline}
 @media (min-width:640px){.brand span{display:inline}}
 .project{display:flex;gap:6px;align-items:center;min-width:0;flex:1}
-.project select{min-width:0;flex:1;max-width:340px}
+.project .projbtn{max-width:360px}
 .seg.modeseg{display:none;margin-left:auto}
 @media (min-width:1000px){.seg.modeseg{display:inline-flex}}
 
@@ -244,6 +244,36 @@ details.help code{font-family:var(--mono);color:var(--ink)}
 .tpls .tplic svg{width:22px;height:22px}
 .tpls .tpltx{display:flex;flex-direction:column;gap:3px;min-width:0}
 .tpls em{font-style:normal;font-size:.72rem;font-weight:600;color:var(--amber);letter-spacing:.02em}
+.projbtn{display:flex;align-items:center;gap:8px;min-width:0;flex:1;border:1px solid var(--line);background:var(--sheet);border-radius:10px;padding:8px 12px;font-weight:600;text-align:left}
+.projbtn svg{width:18px;height:18px;flex:none;color:var(--accent)}
+.projbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:14px}
+.pcard{border:1px solid var(--line);background:var(--sheet);border-radius:14px;padding:14px;text-align:left;display:grid;grid-template-columns:minmax(0,1fr) auto;overflow:hidden;min-width:0;grid-template-areas:"top top" "main spark" "sub spark";gap:4px 12px;align-items:end;box-shadow:0 1px 0 var(--line);min-height:104px}
+.pcard:hover{border-color:var(--accent)}
+.pcard:active{transform:scale(.99)}
+.pcard .ptop{grid-area:top;display:flex;justify-content:space-between;gap:8px;align-items:baseline;min-width:0}
+.pcard .pname{font-weight:600;font-size:1.02rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pcard .ptop small{color:var(--muted);font-size:.75rem;white-space:nowrap}
+.pcard .pmain{grid-area:main;font-family:var(--mono);font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pcard .pmain b{font-size:1.45rem;font-weight:500;letter-spacing:-.02em;margin-right:4px}
+.pcard .pspark{grid-area:spark;width:96px;height:38px}
+.pcard .pspark svg{width:100%;height:100%;display:block}
+.pcard .psub{grid-area:sub;color:var(--muted);font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pcard.pnew{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-style:dashed;background:transparent;box-shadow:none;color:var(--accent)}
+.pcard.pnew svg{width:24px;height:24px}
+.pcard.pnew small{color:var(--muted)}
+.homesync{display:flex;align-items:center;gap:6px;margin:6px 0 0;color:var(--muted);font-size:.85rem}
+.homesync svg{width:16px;height:16px}
+.pcard .up{color:var(--accent)} .pcard .down{color:var(--danger)}
+.qchoice{display:flex;flex-direction:column;gap:6px;font-size:.8rem;color:var(--muted);font-weight:500;grid-column:1/-1}
+.qchips{display:flex;flex-wrap:wrap;gap:6px}
+.qchips button{border:1px solid var(--line);background:var(--sheet);color:var(--ink);border-radius:999px;padding:8px 14px;font-size:.95rem;font-weight:500}
+.qchips button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--sheet)}
+.sumline{margin:0 0 12px;padding:10px 14px;border-radius:12px;background:var(--accent-soft);color:var(--ink);font-size:.95rem;line-height:1.45}
+.sumline b{font-family:var(--mono);font-weight:500}
+.unitrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.unitrow input{width:84px!important;flex:none}
+input.switch{width:20px;height:20px;accent-color:var(--accent)}
 .tplgroup h4{margin:18px 0 8px;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
 .tplwrap .tplgroup:first-child h4{margin-top:4px}
 .home{position:fixed;inset:0;z-index:20;overflow-y:auto;background:var(--paper);
@@ -363,8 +393,7 @@ body.athome .app{visibility:hidden}
       <span>Gráficalo</span>
     </div>
     <div class="project">
-      <select id="projectSel" data-t-aria="Proyecto"></select>
-      <button class="btn icon" id="newProject" data-t-title="Nuevo proyecto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="projbtn" id="homeBtn" data-t-title="Tus proyectos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg><span id="projName"></span></button>
     </div>
     <div class="seg modeseg" role="group" id="modeSeg"><button data-mode="editor" aria-pressed="true" data-t="Editor">Editor</button><button data-mode="panel" aria-pressed="false" data-t="Panel">Panel</button></div>
     <button class="btn icon" id="undoBtn" data-t-title="Deshacer" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></button>
@@ -409,6 +438,7 @@ body.athome .app{visibility:hidden}
 
     <section class="view" id="view-panel" hidden>
       <div class="vhead"><h2 id="panelTitle"></h2><span class="badge warn" id="panelFiltered" hidden></span></div>
+      <p class="sumline" id="sumLinePanel" hidden></p>
       <div class="quick" id="quickPanel" hidden></div>
       <div class="kpis" id="kpis"></div>
       <div class="panelgrid" id="panelGrid"></div>
@@ -416,6 +446,7 @@ body.athome .app{visibility:hidden}
 
     <section class="view" id="view-stats" hidden>
       <div class="vhead"><h2 data-t="Estadísticas">Estadísticas</h2><div class="grp"><span class="badge warn" id="statsFiltered" hidden></span><button class="btn small" id="copyStats"></button></div></div>
+      <p class="sumline" id="sumLine" hidden></p>
       <div class="subnav" id="statsNav" role="tablist"></div>
       <p class="explain" id="explain" hidden></p>
       <div id="statsBody" class="sblock"></div>

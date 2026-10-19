@@ -150,6 +150,7 @@ async function syncNow(opts = {}) {
     syncState.busy = false;
     if (syncState.again) { syncState.again = false; syncSoon(); }
     if ($("#sheet") && !$("#sheet").hidden && $("#syncInfo")) $("#syncInfo").innerHTML = syncInfoHTML();
+    if (!$("#home").hidden) showHome();
   }
 }
 const syncSoon = debounce(() => { if (!syncState.applying) syncNow({ auto: true }); }, 2500);

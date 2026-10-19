@@ -114,6 +114,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) hidde
 
 /* ---------- novedades ---------- */
 const WHATS_NEW = {
+  "0.6": ["Tus proyectos en tarjetas al abrir la app, con su último valor y un minigráfico.", "Unidades en las columnas (€, kg, %…) que se ven en la tabla, los gráficos y las estadísticas.", "Un resumen en una frase encima de las estadísticas.", "Botones de un toque en el registro rápido para respuestas como Sí / No.", "Modo sencillo: las estadísticas avanzadas se activan en Ajustes."],
   "0.5": ["Sincroniza tus proyectos entre el móvil y el ordenador con Google Drive (Menú → Sincronizar con Google Drive).", "Nueva pantalla de inicio para elegir con qué plantilla empezar, con las plantillas agrupadas.", "Al borrar todos los proyectos ya no vuelven a aparecer los ejemplos."],
   "0.4": ["Tendencia y media de 7 días en los gráficos de evolución, y fecha estimada para llegar a tu objetivo.", "IMC y cambio entre kg y lb en el registro de peso.", "Compara esta semana con la anterior, o este mes con el pasado (Estadísticas → Periodos).", "«¿Qué nota necesito?» en el menú, y media ponderada en las fórmulas.", "Plantillas nuevas: presupuesto anual, hucha de ahorro, tensión, glucosa, horas de trabajo y hábitos.", "Bloqueo con PIN, y envío de sugerencias desde el menú."],
   "0.3": ["Ahora en 7 idiomas.", "Registro rápido: escribe el valor y la fecha se pone sola."]

@@ -6,11 +6,13 @@
   LANG = I18N[want] || want === "es" ? want : "es"; S.setLocale({ decimalComma: decimalComma() }); document.documentElement.lang = LANG;
   applyTheme();
   initState();
+  if (settings.advanced === undefined) { settings.advanced = !!(settings.seenVersion || settings.tutorialDone); saveSettings(); } // quien ya usaba la app lo conserva todo
   hist();
   translateStatic();
   renderChart._w = wide();
   renderAll();
   showView(wide() ? "view-chart" : "view-data");
+  if (state.projects.length) showHome();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { if (settings.theme === "auto") { applyTheme(); renderTable(); refresh(); } });
   document.fonts?.ready.then(() => refresh());
   if (location.hash === "#quick") { try { history.replaceState(null, "", location.pathname + location.search); } catch {} openQuickFromShortcut(); }

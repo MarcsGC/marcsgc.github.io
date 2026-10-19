@@ -37,7 +37,7 @@ const valueLabels = {
       const horiz = chart.options.indexAxis === "y", stacked = !!chart.options.scales?.x?.stacked;
       chart.getDatasetMeta(di).data.forEach((el, i) => {
         const v = yOf(ds.data[i]); if (v == null || !Number.isFinite(v)) return;
-        const txt = fmt(v, o.suffix ? 1 : 2) + (o.suffix || "");
+        const txt = o.suffix ? fmt(v, 1) + o.suffix : withUnit(fmt(v, 2), ds._u || "");
         if (k === "pie" || k === "doughnut") {
           const tot = ds.data.reduce((s, x) => s + (x || 0), 0); if (v / tot < 0.04) return;
           const pos = el.tooltipPosition(); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -145,7 +145,24 @@ function noteIndex(label) {
   const p = cur(), d = data();
   return d.rowIdx.findIndex(i => (String(p.rows[i].l ?? "").trim() || `#${i + 1}`) === label);
 }
+// añade la unidad de cada serie a ejes, etiquetas y tooltips
 function buildConfig(ch, mode = "main") {
+  const cfg = buildConfig0(ch, mode);
+  if (cfg && !cfg.empty) try { addUnits(cfg); } catch {}
+  return cfg;
+}
+function addUnits(cfg) {
+  const dss = cfg.data?.datasets || [], o = cfg.options; if (!o || !dss.some(x => x._u)) return;
+  const tip = o.plugins.tooltip.callbacks;
+  if (!tip.label) tip.label = x => { const v = yOf(x.raw); return ` ${x.dataset.label}: ${Number.isFinite(v) ? withUnit(fmt(v), x.dataset._u || "") : "—"}`; };
+  const horiz = o.indexAxis === "y";
+  ["y", "y1"].forEach(id => {
+    const us = [...new Set(dss.filter(x => (x.yAxisID || "y") === id).map(x => x._u || ""))];
+    const ax = horiz && id === "y" ? o.scales?.x : o.scales?.[id];
+    if (us.length === 1 && us[0] && ax && !(ax.title && ax.title.display)) ax.title = { display: true, text: us[0], color: css("--muted") };
+  });
+}
+function buildConfig0(ch, mode = "main") {
   const p = cur(), d = data();
   const ink = css("--ink"), muted = css("--muted"), grid = css("--grid"), pal = palette();
   const fsz = { s: 10, m: 12, l: 15 }[ch.font] || 12, fs = mode === "panel" ? Math.max(10, fsz - 1) : fsz;
@@ -192,7 +209,7 @@ function buildConfig(ch, mode = "main") {
   const pt = (vals) => (useTime ? vals.map((v, k) => ({ x: d.ts[k], y: v })) : vals);
   const meanDs = (c, color, yAxisID) => {
     const m = S.mean(d.vals(c.id)); if (!Number.isFinite(m)) return null;
-    return { type: "line", label: t("Media {s}", { s: colName(c) }), data: useTime ? [{ x: Math.min(...d.ts), y: m }, { x: Math.max(...d.ts), y: m }] : labels.map(() => m), borderColor: color, borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, fill: false, _noLabels: true, yAxisID };
+    return { type: "line", _u: unitOf(c), label: t("Media {s}", { s: colName(c) }), data: useTime ? [{ x: Math.min(...d.ts), y: m }, { x: Math.max(...d.ts), y: m }] : labels.map(() => m), borderColor: color, borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, fill: false, _noLabels: true, yAxisID };
   };
 
   if (["bar", "barh", "stacked", "line", "area"].includes(ch.type)) {
@@ -201,7 +218,7 @@ function buildConfig(ch, mode = "main") {
     const kind = ch.type === "line" || ch.type === "area" ? "line" : "bar";
     const ds = sel.map(c => {
       const col = colColor(c);
-      return { label: colName(c), data: pt(d.series(c.id)), borderColor: col, borderWidth: 2,
+      return { label: colName(c), _u: unitOf(c), data: pt(d.series(c.id)), borderColor: col, borderWidth: 2,
         backgroundColor: kind === "bar" ? col : alpha(col, ch.type === "area" ? 0.22 : 0.1),
         fill: ch.type === "area" ? "origin" : false, tension: 0.25, pointRadius: mode === "panel" ? 2.5 : 3.5, borderRadius: ch.type === "stacked" ? 0 : 4, spanGaps: true };
     });
@@ -213,13 +230,13 @@ function buildConfig(ch, mode = "main") {
       sel.forEach(c => {
         const sr = d.series(c.id), pts = d.ts.map((x, k) => [x, sr[k]]).filter(q => q[1] != null).sort((a, b) => a[0] - b[0]);
         const tag = sel.length > 1 ? " · " + colName(c) : "";
-        if (ch.ma7 && pts.length > 2) ds.push({ type: "line", label: t("Media 7 días") + tag, data: pts.map(([x]) => ({ x, y: S.mean(pts.filter(q => q[0] > x - 7 * 864e5 && q[0] <= x).map(q => q[1])) })), borderColor: alpha(colColor(c), 0.75), borderWidth: 3, pointRadius: 0, fill: false, tension: 0.35, _noLabels: true });
+        if (ch.ma7 && pts.length > 2) ds.push({ type: "line", _u: unitOf(c), label: t("Media 7 días") + tag, data: pts.map(([x]) => ({ x, y: S.mean(pts.filter(q => q[0] > x - 7 * 864e5 && q[0] <= x).map(q => q[1])) })), borderColor: alpha(colColor(c), 0.75), borderWidth: 3, pointRadius: 0, fill: false, tension: 0.35, _noLabels: true });
         const tr = ch.trend ? trendInfo(c.id) : null;
         if (tr) {
           const end = Math.min(Math.max(tr.lastTs + 14 * 864e5, c === firstNum && tr.eta ? tr.eta : 0), tr.lastTs + 180 * 864e5);
           xMaxExtra = Math.max(xMaxExtra, end);
           const line = []; for (let k = 0; k <= 20; k++) { const x = tr.fromTs + ((end - tr.fromTs) * k) / 20; line.push({ x, y: tr.at(x / 864e5) }); }
-          ds.push({ type: "line", label: t("Tendencia") + tag, data: line, borderColor: css("--amber"), borderDash: [7, 5], borderWidth: 2, pointRadius: 0, fill: false, _noLabels: true });
+          ds.push({ type: "line", _u: unitOf(c), label: t("Tendencia") + tag, data: line, borderColor: css("--amber"), borderDash: [7, 5], borderWidth: 2, pointRadius: 0, fill: false, _noLabels: true });
         }
       });
     }
@@ -235,8 +252,8 @@ function buildConfig(ch, mode = "main") {
     if (!lines.size && sel.length > 1) lines.add(sel[sel.length - 1].id);
     const bars = sel.filter(c => !lines.has(c.id)), lns = sel.filter(c => lines.has(c.id));
     const ds = [
-      ...lns.map(c => ({ type: "line", label: colName(c), data: d.series(c.id), borderColor: colColor(c), backgroundColor: colColor(c), borderWidth: 2.5, pointRadius: 4, tension: 0.25, yAxisID: bars.length ? "y1" : "y", order: 1, spanGaps: true })),
-      ...bars.map(c => ({ type: "bar", label: colName(c), data: d.series(c.id), backgroundColor: colColor(c), borderColor: colColor(c), borderRadius: 4, yAxisID: "y", order: 2 }))
+      ...lns.map(c => ({ type: "line", _u: unitOf(c), label: colName(c), data: d.series(c.id), borderColor: colColor(c), backgroundColor: colColor(c), borderWidth: 2.5, pointRadius: 4, tension: 0.25, yAxisID: bars.length ? "y1" : "y", order: 1, spanGaps: true })),
+      ...bars.map(c => ({ type: "bar", _u: unitOf(c), label: colName(c), data: d.series(c.id), backgroundColor: colColor(c), borderColor: colColor(c), borderRadius: 4, yAxisID: "y", order: 2 }))
     ];
     if (ch.showMean) bars.forEach(c => { const m = meanDs(c, colColor(c), "y"); if (m) ds.push(m); });
     if (bars.length && lns.length) {
@@ -252,7 +269,7 @@ function buildConfig(ch, mode = "main") {
     if (!items.length) return need(t("Para sectores hacen falta valores positivos en la serie elegida."));
     delete base.scales; if (ch.legend === "top") legend.position = "bottom";
     base.cutout = ch.type === "doughnut" ? "58%" : 0;
-    base.plugins.tooltip.callbacks.label = x => { const tt = x.dataset.data.reduce((s, v) => s + v, 0); return ` ${x.label}: ${fmt(x.raw)} (${fmt((x.raw / tt) * 100, 1)} %)`; };
+    base.plugins.tooltip.callbacks.label = x => { const tt = x.dataset.data.reduce((s, v) => s + v, 0); return ` ${x.label}: ${withUnit(fmt(x.raw), unitOf(c))} (${fmt((x.raw / tt) * 100, 1)} %)`; };
     return { type: ch.type, data: { labels: items.map(o => o.label), datasets: [{ label: colName(c), data: items.map(o => o.v), backgroundColor: items.map((_, i) => pal[i % pal.length]), borderColor: css("--sheet"), borderWidth: 2 }] }, options: base };
   }
   if (ch.type === "radar") {
@@ -560,14 +577,15 @@ function renderPanel() {
   destroyPanel();
   const p = cur(), d = data();
   renderChartTitle(); updateCount();
+  const sl = summaryLine(); $("#sumLinePanel").hidden = !sl; $("#sumLinePanel").innerHTML = sl;
   const tiles = [];
   numCols().slice(0, 8).forEach(c => {
     const v = d.vals(c.id); if (!v.length) return;
     const s = S.describe(v), dot = `<i style="background:${colColor(c)}"></i>`;
     if (p.labelType === "date" && v.length >= 2) {
       const ser = d.series(c.id).filter(x => x != null), last = ser[ser.length - 1], prev = ser[ser.length - 2], diff = last - prev;
-      tiles.push(`<div class="kpi"><span class="k">${dot}${esc(colName(c))} · ${t("último")}</span><span class="v">${fmt(last)}</span><span class="s"><span class="${trendClass(diff, last, c)}">${diff > 0 ? "▲" : diff < 0 ? "▼" : "="} ${fmt(Math.abs(diff))}</span> · ${t("media")} ${fmt(s.mean)}</span></div>`);
-    } else tiles.push(`<div class="kpi"><span class="k">${dot}${esc(colName(c))} · ${t("media")}</span><span class="v">${fmt(s.mean)}</span><span class="s">${t("total")} ${fmt(s.sum)} · n ${s.n}</span><span class="s">${fmt(s.min)} – ${fmt(s.max)}</span></div>`);
+      tiles.push(`<div class="kpi"><span class="k">${dot}${esc(colName(c))} · ${t("último")}</span><span class="v">${fmtU(last, c)}</span><span class="s"><span class="${trendClass(diff, last, c)}">${diff > 0 ? "▲" : diff < 0 ? "▼" : "="} ${fmt(Math.abs(diff))}</span> · ${t("media")} ${fmt(s.mean)}</span></div>`);
+    } else tiles.push(`<div class="kpi"><span class="k">${dot}${esc(colName(c))} · ${t("media")}</span><span class="v">${fmtU(s.mean, c)}</span><span class="s">${t("total")} ${fmtU(s.sum, c)} · n ${s.n}</span><span class="s">${fmt(s.min)} – ${fmt(s.max)}</span></div>`);
   });
   p.cols.filter(c => c.kind === "text").slice(0, 3).forEach(c => {
     const list = S.countCategories(d.cat(c.id)); if (!list.length) return;

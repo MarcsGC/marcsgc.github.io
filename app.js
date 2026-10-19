@@ -7,6 +7,17 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "
 const LOC = () => localeTag();
 const fmt = (n, d = 2) => (Number.isFinite(n) ? n.toLocaleString(LOC(), { maximumFractionDigits: d }) : "—");
 const fmtSig = v => { if (!Number.isFinite(v)) return "—"; const a = Math.abs(v); return v.toLocaleString(LOC(), { maximumSignificantDigits: a >= 1000 ? 7 : 4 }); };
+// unidades de las columnas (€, kg, %…)
+const CUR_UNITS = new Set(["€", "$", "£"]);
+const unitOf = c => (c && typeof c === "object" && c.unit ? String(c.unit).trim() : "");
+function withUnit(s, u) {
+  if (!u || s === "—") return s;
+  if (LANG === "en" && CUR_UNITS.has(u)) return /^[-−]/.test(s) ? "−" + u + s.slice(1) : u + s;
+  if (LANG === "en" && u === "%") return s + "%";
+  return s + "\u00a0" + u;
+}
+const fmtU = (v, c, d) => withUnit(fmt(v, d), typeof c === "string" ? c : unitOf(c));
+const aggOf = c => c.agg || (CUR_UNITS.has(unitOf(c)) || ["h", "km", "min"].includes(unitOf(c)) ? "sum" : "mean");
 const fmtP = p => (!Number.isFinite(p) ? "—" : p < 0.0001 ? "< " + fmt(0.0001, 4) : fmt(p, 4));
 const pct = v => fmt(v * 100, 1) + (LANG === "en" ? "%" : "\u00a0%");
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -211,22 +222,100 @@ function tplGrid() {
     return `<button data-act="tpl:${k}"><span class="tplic">${ICON(TPL_IC[k] || TPL_IC.blank)}</span><span class="tpltx"><b>${esc(x.name())}</b><small>${esc(x.desc())}</small>${QUICK_TPL.has(k) ? `<em>${t("Registro rápido")}</em>` : ""}</span></button>`;
   }).join("")}</div></section>`).join("");
 }
+const TPL_COLS = {
+  gastos: [{ unit: "€", agg: "sum" }, { unit: "%" }],
+  peso: [{ unit: "kg" }],
+  presupuesto: [{ unit: "€", agg: "sum" }, { unit: "€", agg: "sum" }, { unit: "€", agg: "sum" }, { unit: "%" }],
+  ahorro: [{ unit: "€", agg: "last" }],
+  tension: [{ unit: "mmHg" }, { unit: "mmHg" }],
+  glucosa: [{ unit: "mg/dL" }, { options: () => [t("En ayunas"), t("Después de comer"), t("Antes de dormir")] }],
+  horas: [{ unit: "h", agg: "sum" }],
+  habitos: [{ options: () => [t("Sí"), t("No")] }, { options: () => [t("Sí"), t("No")] }],
+  diario: [{ unit: "kg" }, { unit: "h", agg: "mean" }],
+  deporte: [{ unit: "km", agg: "sum" }, { unit: "min", agg: "sum" }],
+  ventas: [{ unit: "€", agg: "sum" }, { unit: "€", agg: "sum" }, { unit: "€", agg: "sum" }],
+  relacion: [{ unit: "h" }]
+};
 function newFromTemplate(key) {
   const x = TEMPLATES.find(y => y.key === key); if (!x) return;
   const p = x.make();
+  (TPL_COLS[key] || []).forEach((o, i) => { const c = p.cols[i]; if (!c) return; Object.entries(o).forEach(([k, v]) => (c[k] = typeof v === "function" ? v() : v)); });
   let n = 2; const base = p.name; while (state.projects.some(q => q.name === p.name)) p.name = `${base} ${n++}`;
   p.updated = Date.now();
   if (!settings.tutorialDone) { settings.tutorialDone = true; saveSettings(); }
   addProject(p); hideHome(); showView("view-data");
   setTimeout(() => $(QUICK_TPL.has(key) ? "#quick [data-qc]" : "#tbody input")?.focus(), 120);
 }
-/* Pantalla de inicio: aparece cuando no hay ningún proyecto */
+/* Pantalla de inicio: tus proyectos en tarjetas o, si no hay ninguno, las plantillas */
+const GEAR = '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z"/>';
+// cifras de una tarjeta sin cambiar de proyecto: primera columna numérica (o la del resumen)
+function cardInfo(p) {
+  const nums = p.cols.filter(c => c.kind !== "text");
+  const pref = nums.find(c => c.id === p.stats?.sumCol), c = pref || nums[0];
+  const rowsWith = p.rows.filter(r => String(r.l ?? "").trim() || Object.values(r.c).some(v => String(v).trim()));
+  const info = { c, n: rowsWith.length, pts: [] };
+  if (!c) return info;
+  let vals;
+  try { vals = S.computeTable(p.cols.map(k => ({ formula: k.kind === "formula" ? k.formula : null })), p.rows.map(r => p.cols.map(k => r.c[k.id] ?? ""))).values[p.cols.indexOf(c)]; } catch { return info; }
+  const pts = p.rows.map((r, i) => ({ l: r.l, v: vals[i], ts: p.labelType === "date" && r.l ? tsOf(r.l) : null })).filter(x => Number.isFinite(x.v));
+  if (p.labelType === "date") pts.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  info.pts = pts; return info;
+}
+function sparkSVG(pts, isDate, color) {
+  if (pts.length < 2) return "";
+  const W = 120, H = 34, vs = pts.map(x => x.v), mn = Math.min(...vs), mx = Math.max(...vs), rg = mx - mn || 1;
+  if (!isDate) {
+    const show = pts.slice(0, 16), bw = W / show.length, base = Math.min(0, mn), top = Math.max(0, mx), r2 = top - base || 1;
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${show.map((x, i) => { const h = Math.max(1.5, ((x.v - base) / r2) * (H - 2)); return `<rect x="${(i * bw + bw * 0.15).toFixed(1)}" y="${(H - h).toFixed(1)}" width="${(bw * 0.7).toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${color}" opacity=".85"/>`; }).join("")}</svg>`;
+  }
+  const t0 = pts[0].ts, t1 = pts[pts.length - 1].ts, tr = t1 - t0 || 1;
+  const xy = pts.map(x => [((x.ts - t0) / tr) * (W - 4) + 2, H - 3 - ((x.v - mn) / rg) * (H - 6)]);
+  const d = xy.map((q, i) => (i ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1)).join(" ");
+  const last = xy[xy.length - 1];
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d} L${last[0].toFixed(1)} ${H} L2 ${H}Z" fill="${color}" opacity=".12"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+}
+function projectCard(p) {
+  const { c, n, pts } = cardInfo(p), isDate = p.labelType === "date", color = css("--accent");
+  let main = "", sub = "";
+  if (c && pts.length) {
+    if (isDate) {
+      const last = pts[pts.length - 1], prev = pts[pts.length - 2];
+      main = `<b>${esc(fmtU(last.v, c))}</b>`;
+      let dl = "";
+      if (prev) {
+        const df = last.v - prev.v, good = Number.isFinite(p.goal) && df ? (Math.abs(last.v - p.goal) < Math.abs(prev.v - p.goal) ? "up" : "down") : "";
+        dl = `<span class="${good}">${df > 0 ? "▲" : df < 0 ? "▼" : "="}${df ? " " + esc(fmtU(Math.abs(df), c)) : ""}</span> · `;
+      }
+      sub = `${dl}${esc(colName2(p, c))} · ${fmtDate(last.l)}`;
+    } else {
+      const vs = pts.map(x => x.v), agg = aggOf(c);
+      main = `<b>${esc(fmtU(agg === "sum" ? S.sum(vs) : S.mean(vs), c))}</b>`;
+      const aw = agg === "sum" ? t("Total") : t("Media"), cn = colName2(p, c);
+      sub = cn && cn !== aw ? `${aw} · ${esc(cn)}` : aw;
+    }
+  } else sub = n ? t("{n} filas", { n }) : t("Vacío");
+  const ago = p.updated ? agoShort(p.updated) : "";
+  return `<button class="pcard" data-open="${p.id}"><span class="ptop"><b class="pname">${esc(p.name)}</b>${ago ? `<small>${ago}</small>` : ""}</span>
+    <span class="pmain">${main || "&nbsp;"}</span><span class="pspark">${c ? sparkSVG(pts, isDate, color) : ""}</span><small class="psub">${sub}</small></button>`;
+}
+const colName2 = (p, c) => { const u = unitOf(c), nm = c.name || ""; return u && !nm.includes(u) ? nm : nm.replace(/\s*\([^)]*\)\s*$/, "") || nm; };
+function agoShort(ts) {
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1) return t("ahora mismo"); if (m < 60) return t("hace {n} min", { n: m });
+  const h = Math.round(m / 60); if (h < 24) return t("hace {n} h", { n: h });
+  return fmtDate(isoOf(new Date(ts)), new Date(ts).getFullYear() !== new Date().getFullYear());
+}
 function showHome() {
-  const h = $("#home");
+  const h = $("#home"), has = state.projects.length > 0;
+  const list = [...state.projects].sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  const syncLine = typeof syncOn === "function" && syncOn() ? `<p class="homesync">${ICON(IC.cloud)}<span>${esc(syncMenuSub())}</span></p>` : "";
   h.innerHTML = `<div class="homein">
     <div class="homebar"><div class="brand">${$(".brand svg").outerHTML}<span>Gráficalo</span></div>
-      <button class="btn icon" data-h="settings" title="${t("Tema, idioma y PIN")}">${ICON('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z"/>')}</button></div>
-    <div class="hero"><h1>${t("¿Qué quieres medir?")}</h1><p>${t("Elige una plantilla para empezar. Después podrás cambiar las columnas, los gráficos y todo lo demás.")}</p></div>
+      <div class="grp">${has ? `<button class="btn icon" data-h="menu" title="${t("Menú")}">${ICON('<path d="M4 7h16M4 12h16M4 17h16"/>')}</button>` : `<button class="btn icon" data-h="settings" title="${t("Ajustes")}">${ICON(GEAR)}</button>`}</div></div>
+    ${has ? `<div class="hero"><h1>${t("Tus proyectos")}</h1>${syncLine}</div>
+      <div class="pcards">${list.map(projectCard).join("")}
+        <button class="pcard pnew" data-h="new">${ICON(IC.plus)}<b>${t("Nuevo proyecto")}</b><small>${t("Elige una plantilla")}</small></button></div>`
+    : `<div class="hero"><h1>${t("¿Qué quieres medir?")}</h1><p>${t("Elige una plantilla para empezar. Después podrás cambiar las columnas, los gráficos y todo lo demás.")}</p></div>
     ${tplGrid()}
     <section class="homealt"><h4>${t("¿Ya usas Gráficalo en otro dispositivo?")}</h4>
       <div class="homebtns">
@@ -234,18 +323,46 @@ function showHome() {
         <button class="btn" data-h="restore">${ICON(IC.imp)}${t("Restaurar una copia de seguridad")}</button>
       </div>
       <button class="linkbtn" data-h="tutorial">${t("Ver cómo funciona")}</button>
-    </section></div>`;
-  h.hidden = false; document.body.classList.add("athome");
+    </section>`}</div>`;
+  const was = h.hidden; h.hidden = false; document.body.classList.add("athome"); if (was) h.scrollTop = 0;
   h.onclick = e => {
     const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.open) return openProject(b.dataset.open);
     if (b.dataset.act?.startsWith("tpl:")) return newFromTemplate(b.dataset.act.slice(4));
     const k = b.dataset.h;
+    if (k === "new") newProjectSheet();
+    if (k === "menu") homeMenu();
     if (k === "settings") settingsSheet();
     if (k === "restore") $("#backupIn").click();
     if (k === "tutorial") showOnboarding();
     if (k === "sync") typeof syncSheet === "function" ? syncSheet() : toast(t("No disponible"));
   };
   $("#undoBtn").disabled = $("#redoBtn").disabled = true;
+}
+// menú de la pantalla de inicio: lo que no depende de un proyecto
+function homeMenu() {
+  openSheet(`<h3>${t("Menú")}</h3><div class="menu">
+      ${menuItem("new", IC.plus, t("Nuevo proyecto"))}
+      ${typeof gdEnabled === "function" && gdEnabled() ? menuItem("sync", IC.cloud, t("Sincronizar con Google Drive"), syncMenuSub()) : ""}
+      ${menuItem("backup", IC.save, t("Guardar copia de seguridad"), t("Todos tus proyectos en un archivo"))}
+      ${menuItem("restore", IC.imp, t("Restaurar copia de seguridad"))}
+      ${menuItem("settings", IC.sun, t("Ajustes"), t("Tema, idioma y PIN"))}
+      ${menuItem("grades", IC.help, t("¿Qué nota necesito?"), t("Calcula la nota que te hace falta en el próximo examen"))}
+      ${menuItem("news", IC.info, t("Novedades"))}
+      ${menuItem("feedback", IC.info, t("Enviar sugerencias o errores"))}
+      ${menuItem("about", IC.info, t("Acerca de Gráficalo"))}
+    </div><div class="actions"><button class="btn ghost" data-act="close">${t("Cerrar")}</button></div>`,
+  act => {
+    if (act === "new") newProjectSheet();
+    if (act === "sync") syncSheet();
+    if (act === "backup") backupSheet();
+    if (act === "restore") $("#backupIn").click();
+    if (act === "settings") settingsSheet();
+    if (act === "grades") gradeSheet();
+    if (act === "news") whatsNewSheet(true);
+    if (act === "feedback") feedbackSheet();
+    if (act === "about") aboutSheet();
+  });
 }
 function hideHome() { $("#home").hidden = true; document.body.classList.remove("athome"); }
 
@@ -330,7 +447,7 @@ const dirty = () => { cache = null; };
 const colById = id => cur().cols.find(c => c.id === id);
 const isNum = c => c && c.kind !== "text";
 const numCols = () => cur().cols.filter(isNum);
-function colName(c) { if (c === LABEL) return cur().labelName || t("Etiqueta"); return c ? c.name || L(cur().cols.indexOf(c)) : "—"; }
+function colName(c) { if (c === LABEL) return cur().labelName || t("Etiqueta"); if (!c) return "—"; const n = c.name || L(cur().cols.indexOf(c)), u = unitOf(c); return u && !n.includes(u) ? `${n} (${u})` : n; }
 const nameOf = id => (id === LABEL ? colName(LABEL) : colName(colById(id)));
 function colColor(c) { const p = cur(), i = p.cols.indexOf(c), pal = palette(); return (c && c.color) || pal[Math.max(0, i) % pal.length]; }
 function validId(id, fallbackIdx = 0, onlyNum = true) {
@@ -396,12 +513,15 @@ function passFilter(p, i, f, byId, txt) {
 /* =========================================================
    Cabecera: proyectos
    ========================================================= */
-function renderProjects() {
-  $("#projectSel").innerHTML = state.projects.map(p => `<option value="${p.id}" ${p.id === state.current ? "selected" : ""}>${esc(p.name)}</option>`).join("");
+function renderProjects() { $("#projName").textContent = cur() ? cur().name : ""; }
+$("#homeBtn").addEventListener("click", () => { track(); showHome(); });
+function openProject(id) {
+  track(); state.current = id; hist(); dirty(); saveNow(); hideHome(); renderAll();
+  const p = cur(); showView(wide() ? "view-chart" : "view-data");
+  window.scrollTo(0, 0);
 }
-$("#projectSel").addEventListener("change", e => { track(); state.current = e.target.value; hist(); dirty(); saveNow(); renderAll(); });
-function addProject(p) { track(); p.updated = p.updated || Date.now(); state.projects.push(p); state.current = p.id; hist(); dirty(); saveNow(); renderAll(); }
-$("#newProject").addEventListener("click", () => {
+function addProject(p) { track(); p.updated = p.updated || Date.now(); state.projects.push(p); state.current = p.id; hist(); dirty(); saveNow(); hideHome(); renderAll(); }
+function newProjectSheet() {
   openSheet(`<h3>${t("Nuevo proyecto")}</h3><p class="hint">${t("Elige una plantilla. Las que traen datos los tienen de ejemplo: cámbialos por los tuyos.")}</p>
     <div class="tplwrap">${tplGrid()}</div>
     <div class="actions"><button class="btn ghost" data-act="close">${t("Cancelar")}</button></div>`,
@@ -409,7 +529,7 @@ $("#newProject").addEventListener("click", () => {
     if (!act.startsWith("tpl:")) return;
     closeSheet(); newFromTemplate(act.slice(4));
   });
-});
+}
 $("#undoBtn").addEventListener("click", undo);
 $("#redoBtn").addEventListener("click", redo);
 document.addEventListener("keydown", e => {
@@ -445,7 +565,7 @@ function openMenu() {
       ${menuItem("backup", IC.save, t("Guardar copia de seguridad"), t("Todos tus proyectos en un archivo"))}
       ${menuItem("restore", IC.restore, t("Restaurar copia de seguridad"))}
       ${gdEnabled() ? menuItem("sync", IC.cloud, t("Sincronizar con Google Drive"), syncMenuSub()) : ""}
-      ${menuItem("settings", IC.sun, t("Tema, idioma y PIN"))}
+      ${menuItem("settings", IC.sun, t("Ajustes"), t("Tema, idioma y PIN"))}
       ${menuItem("grades", '<path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-7"/>', t("¿Qué nota necesito?"), t("Calcula la nota que te hace falta en el próximo examen"))}
       ${menuItem("news", '<path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.6 7.1 18.2 8 12.7 4 8.8 9.5 8z"/>', t("Novedades"))}
       ${menuItem("feedback", '<path d="M4 5h16v11H8l-4 4z"/>', t("Enviar sugerencias o errores"))}
@@ -468,7 +588,7 @@ function openMenu() {
       delete HIST[p.id];
       state.projects = state.projects.filter(x => x.id !== p.id);
       state.deleted[p.id] = Date.now();
-      state.current = state.projects[0]?.id || null; hist(); dirty(); saveNow(); renderAll(); toast(t("Proyecto borrado"));
+      state.current = state.projects[0]?.id || null; hist(); dirty(); saveNow(); showHome(); toast(t("Proyecto borrado"));
       
     });
     if (act === "backup") backupSheet();
@@ -496,11 +616,13 @@ function confirmSheet(title, text, okLabel, fn) {
 }
 function settingsSheet() {
   const seg = (k, opts) => `<div class="seg" role="group">${opts.map(([v, l]) => `<button data-act="${k}:${v}" aria-pressed="${(settings[k] || "auto") === v}">${l}</button>`).join("")}</div>`;
-  openSheet(`<h3>${t("Tema e idioma")}</h3>
+  openSheet(`<h3>${t("Ajustes")}</h3>
     <div class="setrow"><span>${t("Tema")}</span>${seg("theme", [["auto", t("Automático")], ["light", t("Claro")], ["dark", t("Oscuro")]])}</div>
     <div class="setrow"><label for="langSel">${t("Idioma")}</label><select id="langSel">${Object.entries(LANGS).map(([k, n]) => `<option value="${k}" ${k === LANG ? "selected" : ""}>${n}</option>`).join("")}</select></div>
     <div class="setrow"><span>${t("Bloqueo con PIN")}</span><div class="grp">${settings.pin ? `<button class="btn small" data-act="pin:set">${t("Cambiar")}</button><button class="btn small danger" data-act="pin:off">${t("Quitar")}</button>` : `<button class="btn small" data-act="pin:set">${t("Activar")}</button>`}</div></div>
     <p class="hint">${t("El PIN evita que otros abran la app en tu móvil. No cifra los datos.")}</p>
+    <label class="setrow"><span>${t("Modo avanzado")}</span><input type="checkbox" class="switch" id="advChk" ${settings.advanced ? "checked" : ""}></label>
+    <p class="hint">${t("Muestra los contrastes de hipótesis, la calculadora de probabilidad, las tablas cruzadas y las columnas con fórmulas.")}</p>
     <div class="actions"><button class="btn primary" data-act="close">${t("Hecho")}</button></div>`,
   act => {
     if (act === "pin:set") return pinSetSheet();
@@ -508,6 +630,7 @@ function settingsSheet() {
     const [k, v] = act.split(":");
     if (k === "theme") { settings.theme = v; saveSettings(); applyTheme(); renderTable(); refresh(); settingsSheet(); }
   });
+  $("#advChk").addEventListener("change", e => { settings.advanced = e.target.checked; saveSettings(); if (cur()) renderStats(); });
   $("#langSel").addEventListener("change", async e => { settings.lang = e.target.value; saveSettings(); await setLang(e.target.value); settingsSheet(); });
 }
 async function setLang(v) {
@@ -535,7 +658,7 @@ function aboutSheet() {
     <p class="hint"><a href="privacidad.html" target="_blank" rel="noopener" style="color:var(--accent)">${t("Política de privacidad")}</a></p>
     <div class="actions"><button class="btn primary" data-act="close">${t("Cerrar")}</button></div>`, () => {});
 }
-const APP_VERSION = "0.5";
+const APP_VERSION = "0.6";
 
 /* =========================================================
    Tabla de datos
@@ -546,7 +669,7 @@ function renderTable() {
   const lt = p.labelType === "date";
   $("#thead").innerHTML = `<tr><th class="num-col">#</th>
     <th><button class="colhead" data-col="${LABEL}" title="${t("Editar columna")}"><span class="l">${lt ? t("Fecha") : t("Etiqueta")}</span><span class="n">${esc(colName(LABEL))}</span></button></th>
-    ${p.cols.map((c, j) => `<th><button class="colhead" data-col="${c.id}" title="${t("Editar columna")}"><span class="l"><i style="background:${c.kind === "text" ? "transparent;border:1px solid var(--muted)" : colColor(c)}"></i>${L(j)}${c.kind === "formula" ? " · ƒ" : c.kind === "text" ? " · Aa" : ""}${d.errById[c.id] && c.kind === "formula" ? ' <b class="warn">!</b>' : ""}</span><span class="n">${esc(c.name || L(j))}</span></button></th>`).join("")}
+    ${p.cols.map((c, j) => `<th><button class="colhead" data-col="${c.id}" title="${t("Editar columna")}"><span class="l"><i style="background:${c.kind === "text" ? "transparent;border:1px solid var(--muted)" : colColor(c)}"></i>${L(j)}${c.kind === "formula" ? " · ƒ" : c.kind === "text" ? " · Aa" : ""}${d.errById[c.id] && c.kind === "formula" ? ' <b class="warn">!</b>' : ""}</span><span class="n">${esc(colName(c))}</span></button></th>`).join("")}
     <th><button class="addcol" id="addColHead" title="${t("Añadir columna")}" aria-label="${t("Añadir columna")}">＋</button></th></tr>`;
   $("#tbody").innerHTML = p.rows.map((r, i) => `<tr data-i="${i}" class="${filtered() && d.allIdx.includes(i) && !inSet.has(i) ? "out" : ""}"><td class="num-col">${i + 1}</td>
     <td>${lt ? `<input type="date" id="c${i}_l" data-k="l" value="${esc(r.l)}" aria-label="${t("Fecha")} ${i + 1}">` : `<input type="text" id="c${i}_l" data-k="l" value="${esc(r.l)}" aria-label="${t("Etiqueta")} ${i + 1}">`}</td>
@@ -655,8 +778,11 @@ function openColumn(id, isNew = false) {
       <div class="field"><label class="label" for="colColor">${t("Color")}</label><div style="display:flex;gap:8px;align-items:center"><input type="color" id="colColor" value="${toHex(colColor(c))}"><button class="btn small ghost" data-act="autocolor">${t("Automático")}</button></div></div>
     </div>
     <div class="field"><span class="label">${t("Contenido")}</span>
-      <div class="seg" role="group" id="kindSeg"><button data-act="kind:num" aria-pressed="${kind === "num"}">${t("Números")}</button><button data-act="kind:text" aria-pressed="${kind === "text"}">${t("Texto")}</button><button data-act="kind:formula" aria-pressed="${kind === "formula"}">${t("Fórmula")}</button></div>
+      <div class="seg" role="group" id="kindSeg"><button data-act="kind:num" aria-pressed="${kind === "num"}">${t("Números")}</button><button data-act="kind:text" aria-pressed="${kind === "text"}">${t("Texto")}</button>${settings.advanced || kind === "formula" ? `<button data-act="kind:formula" aria-pressed="${kind === "formula"}">${t("Fórmula")}</button>` : ""}</div>
       <p class="hint" id="kindHint"></p></div>
+    <div class="field" id="unitBox" ${kind === "text" ? "hidden" : ""}><label class="label" for="colUnit">${t("Unidad (opcional)")}</label>
+      <div class="unitrow"><input type="text" id="colUnit" value="${esc(c.unit || "")}" maxlength="8" placeholder="—" autocomplete="off">${["€", "%", "kg", "h", "km", "min"].map(u => `<button class="btn small ghost" data-act="unit:${u}">${u}</button>`).join("")}</div>
+      <p class="hint">${t("Se muestra junto a los números en la tabla, los gráficos y las estadísticas.")}</p></div>
     <div id="fBox" ${kind !== "formula" ? "hidden" : ""} class="field">
       <label class="label" for="colFormula">${t("Fórmula (usa las letras de las columnas)")}</label>
       <input type="text" id="colFormula" value="${esc(c.formula || "")}" placeholder="${esc(ex[2])}" autocomplete="off" autocapitalize="characters" spellcheck="false" style="font-family:var(--mono)">
@@ -683,9 +809,10 @@ function openColumn(id, isNew = false) {
     if (act.startsWith("kind:")) {
       kind = act.slice(5);
       $$("#kindSeg button").forEach(x => x.setAttribute("aria-pressed", x.dataset.act === act));
-      $("#fBox").hidden = kind !== "formula"; kindHint(); if (kind === "formula") { $("#colFormula").focus(); check(); }
+      $("#fBox").hidden = kind !== "formula"; $("#unitBox").hidden = kind === "text"; kindHint(); if (kind === "formula") { $("#colFormula").focus(); check(); }
     }
     if (act.startsWith("ex:")) { $("#colFormula").value = act.slice(3); check(); }
+    if (act.startsWith("unit:")) { const u = $("#colUnit"); u.value = u.value === act.slice(5) ? "" : act.slice(5); }
     if (act === "autocolor") { const prev = c.color; c.color = null; $("#colColor").value = toHex(colColor(c)); c.color = prev; autoColor = true; }
     if (act === "save") {
       c.name = $("#colName").value.trim() || L(j);
@@ -696,6 +823,7 @@ function openColumn(id, isNew = false) {
         c.formula = f;
       } else c.formula = null;
       c.kind = kind;
+      const un = kind === "text" ? "" : $("#colUnit").value.trim().slice(0, 8); if (un) c.unit = un; else delete c.unit;
       if (kind === "text") p.charts.forEach(ch => { ch.series = ch.series.filter(s => s !== id); ch.lineIds = ch.lineIds.filter(s => s !== id); });
       dirty(); persist(); renderTable(); refresh(); closeSheet();
     }
@@ -1023,6 +1151,16 @@ function showOnboarding() {
    Registro rápido (proyectos con fechas)
    ========================================================= */
 const quickCols = () => cur().cols.filter(c => c.kind !== "formula").slice(0, 4);
+// botones de un toque: respuestas de la plantilla + las ya usadas, si son pocas y cortas
+function quickOptions(c) {
+  const count = new Map();
+  (c.options || []).forEach(o => count.set(o, 0));
+  cur().rows.forEach(r => { const v = String(r.c[c.id] ?? "").trim(); if (v) count.set(v, (count.get(v) || 0) + 1); });
+  const list = [...count.keys()];
+  if (!list.length || list.length > 6 || list.some(o => o.length > 18)) return null;
+  const fixed = c.options || [];
+  return list.sort((a, b) => (fixed.indexOf(a) + 1 || 99) - (fixed.indexOf(b) + 1 || 99) || count.get(b) - count.get(a));
+}
 let quickDate = null;
 function renderQuick() {
   const p = cur(), on = p.labelType === "date" && quickCols().length > 0;
@@ -1035,7 +1173,9 @@ function renderQuick() {
   const stats = first ? quickStats(first) : "";
   const html = pre => `<div class="qhead"><b>${t("Registro rápido")}</b>
       <span class="qdate">${isToday ? t("Hoy") + ", " : ""}<input type="date" data-q="date" value="${date}" max="${todayISO()}" aria-label="${t("Fecha")}"></span></div>
-    <div class="qfields">${quickCols().map(c => `<label>${esc(colName(c))}<input type="text" ${c.kind === "num" ? 'inputmode="decimal"' : 'class="txt"'} data-qc="${c.id}" id="${pre}_${c.id}" value="${esc(row ? row.c[c.id] ?? "" : "")}" placeholder="${esc(ph(c))}" enterkeyhint="done" autocomplete="off"></label>`).join("")}</div>
+    <div class="qfields">${quickCols().map(c => { const v = row ? row.c[c.id] ?? "" : "", ops = c.kind === "text" ? quickOptions(c) : null;
+      return ops ? `<div class="qchoice"><span>${esc(colName(c))}</span><input type="hidden" data-qc="${c.id}" id="${pre}_${c.id}" value="${esc(v)}"><div class="qchips" role="group">${ops.map(o => `<button type="button" data-chip="${esc(o)}" aria-pressed="${o === String(v).trim()}">${esc(o)}</button>`).join("")}</div></div>`
+        : `<label>${esc(colName(c))}<input type="text" ${c.kind === "num" ? 'inputmode="decimal"' : 'class="txt"'} data-qc="${c.id}" id="${pre}_${c.id}" value="${esc(v)}" placeholder="${esc(ph(c))}" enterkeyhint="done" autocomplete="off"></label>`; }).join("")}</div>
     <div class="qrow"><button class="btn primary" data-q="save">${ICON(row ? IC.edit : IC.plus)}${row ? t("Actualizar") : t("Guardar")}</button>${first ? `<button class="btn" data-q="goal" title="${t("Objetivo y ajustes")}">${ICON('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.5"/>')}${Number.isFinite(p.goal) ? fmt(p.goal) : t("Objetivo")}</button>` : ""}</div>
     ${stats ? `<div class="qstats">${stats}</div>` : ""}`;
   const focused = document.activeElement && document.activeElement.closest(".quick") ? document.activeElement.id : null;
@@ -1048,17 +1188,17 @@ function quickStats(c) {
   if (!pts.length) return `<span>${t("Escribe tu primer valor y pulsa Guardar. La fecha se pone sola.")}</span>`;
   pts.sort((a, b) => a[0] - b[0]);
   const last = pts[pts.length - 1], prev = pts[pts.length - 2], firstP = pts[0];
-  const arrow = x => (x ? `<span class="${trendClass(x, last[1], c)}">${x > 0 ? "▲" : "▼"} ${fmt(Math.abs(x))}</span>` : "=");
-  const out = [`<span>${t("Último")}: <b>${fmt(last[1])}</b> (${fmtDate(isoOf(new Date(last[0])))})</span>`];
+  const arrow = x => (x ? `<span class="${trendClass(x, last[1], c)}">${x > 0 ? "▲" : "▼"} ${fmtU(Math.abs(x), c)}</span>` : "=");
+  const out = [`<span>${t("Último")}: <b>${fmtU(last[1], c)}</b> (${fmtDate(isoOf(new Date(last[0])))})</span>`];
   if (prev) out.push(`<span>${arrow(last[1] - prev[1])} ${t("desde el anterior")}</span>`);
   if (pts.length > 2) out.push(`<span>${arrow(last[1] - firstP[1])} ${t("desde el {d}", { d: fmtDate(isoOf(new Date(firstP[0]))) })}</span>`);
   const wk = pts.filter(x => x[0] > last[0] - 7 * 864e5).map(x => x[1]);
-  if (wk.length > 1) out.push(`<span>${t("Media 7 días")}: <b>${fmt(S.mean(wk))}</b></span>`);
-  if (Number.isFinite(p.goal)) { const r = last[1] - p.goal; out.push(Math.abs(r) < 1e-9 ? `<span class="up">${t("¡Objetivo conseguido!")}</span>` : `<span>${t("A {x} del objetivo", { x: `<b>${fmt(Math.abs(r))}</b>` })}</span>`); }
+  if (wk.length > 1) out.push(`<span>${t("Media 7 días")}: <b>${fmtU(S.mean(wk), c)}</b></span>`);
+  if (Number.isFinite(p.goal)) { const r = last[1] - p.goal; out.push(Math.abs(r) < 1e-9 ? `<span class="up">${t("¡Objetivo conseguido!")}</span>` : `<span>${t("A {x} del objetivo", { x: `<b>${fmtU(Math.abs(r), c)}</b>` })}</span>`); }
   const tr = trendInfo(c.id);
   if (tr) {
     const wkRate = tr.slope * 7;
-    out.push(`<span>${t("Ritmo")}: <b>${wkRate > 0 ? "+" : wkRate < 0 ? "−" : ""}${fmt(Math.abs(wkRate))}</b> ${t("por semana")}</span>`);
+    out.push(`<span>${t("Ritmo")}: <b>${wkRate > 0 ? "+" : wkRate < 0 ? "−" : ""}${fmtU(Math.abs(wkRate), c)}</b> ${t("por semana")}</span>`);
     if (Number.isFinite(p.goal) && Math.abs(last[1] - p.goal) > 1e-9) out.push(tr.eta ? `<span class="up">${t("A este ritmo, objetivo el {d}", { d: fmtDate(isoOf(new Date(tr.eta)), new Date(tr.eta).getFullYear() !== new Date().getFullYear()) })}</span>` : `<span>${t("A este ritmo no te acercas al objetivo")}</span>`);
   }
   if (p.bodyWeight && p.height > 0 && c === p.cols.find(x => x.kind === "num")) {
@@ -1072,7 +1212,7 @@ function quickSave(box) {
   const p = cur(), date = box.querySelector("[data-q=date]").value || todayISO();
   const vals = {}; let any = false;
   box.querySelectorAll("[data-qc]").forEach(i => { const v = i.value.trim(); if (v !== "") { vals[i.dataset.qc] = v; any = true; } });
-  if (!any) { toast(t("Escribe al menos un valor")); box.querySelector("[data-qc]")?.focus(); return; }
+  if (!any) { toast(t("Escribe al menos un valor")); box.querySelector("input[data-qc]:not([type=hidden])")?.focus(); return; }
   const bad = quickCols().find(c => c.kind === "num" && vals[c.id] !== undefined && !Number.isFinite(S.parseNum(vals[c.id])));
   if (bad) { toast(t("«{v}» no es un número", { v: vals[bad.id] })); return; }
   let r = p.rows.find(x => x.l === date);
@@ -1140,11 +1280,16 @@ function convertUnit(p, col, to) {
   p.rows.forEach(r => { const v = S.parseNum(r.c[col.id]); if (Number.isFinite(v)) r.c[col.id] = f(v); });
   if (Number.isFinite(p.goal)) p.goal = Math.round(p.goal * k * 10) / 10;
   col.name = col.name.replace(to === "lb" ? /\(kg\)/ : /\(lb\)/, to === "lb" ? "(lb)" : "(kg)");
+  if (col.unit === "kg" || col.unit === "lb") col.unit = to;
   toast(t("Valores convertidos a {u}", { u: to }));
 }
 ["#quick", "#quickPanel"].forEach(sel => {
   const box = $(sel);
-  box.addEventListener("click", e => { const b = e.target.closest("[data-q]"); if (!b || b.tagName === "INPUT") return; if (b.dataset.q === "save") quickSave(box); if (b.dataset.q === "goal") trackSheet(); });
+  box.addEventListener("click", e => {
+    const chip = e.target.closest("[data-chip]");
+    if (chip) { const wrap = chip.closest(".qchoice"), inp = wrap.querySelector("[data-qc]"), on = chip.getAttribute("aria-pressed") !== "true";
+      wrap.querySelectorAll("[data-chip]").forEach(x => x.setAttribute("aria-pressed", "false")); chip.setAttribute("aria-pressed", String(on)); inp.value = on ? chip.dataset.chip : ""; return; }
+    const b = e.target.closest("[data-q]"); if (!b || b.tagName === "INPUT") return; if (b.dataset.q === "save") quickSave(box); if (b.dataset.q === "goal") trackSheet(); });
   box.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("[data-qc]")) { e.preventDefault(); quickSave(box); } });
   box.addEventListener("change", e => { if (e.target.dataset.q === "date") { quickDate = e.target.value && e.target.value !== todayISO() ? e.target.value : null; renderQuick(); } });
 });
@@ -1152,7 +1297,7 @@ function openQuickFromShortcut() {
   const dated = state.projects.filter(p => p.labelType === "date" && p.cols.length).sort((a, b) => (b.updated || 0) - (a.updated || 0));
   const target = (cur()?.labelType === "date" ? cur() : null) || dated[0];
   if (!target) return;
-  if (target !== cur()) { state.current = target.id; hist(); dirty(); renderAll(); }
+  openProject(target.id);
   showView("view-data"); setTimeout(() => { const i = $("#quick [data-qc]"); i?.focus(); }, 150);
 }
 
@@ -1160,4 +1305,4 @@ function openQuickFromShortcut() {
    Ciclo de renderizado
    ========================================================= */
 function refresh() { if (!cur()) return; updateCount(); renderQuick(); renderChartUI(); renderStats(); if (currentView === "view-panel") renderPanel(); }
-function renderAll() { dirty(); if (!cur()) { renderProjects(); showHome(); return; } if (!$("#home").hidden) hideHome(); renderProjects(); renderTable(); refresh(); updateUndo(); }
+function renderAll() { dirty(); if (!cur()) { renderProjects(); showHome(); return; } renderProjects(); if (!$("#home").hidden) { showHome(); return; } renderTable(); refresh(); updateUndo(); }

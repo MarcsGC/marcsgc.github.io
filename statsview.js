@@ -1,6 +1,7 @@
 /* Gráficalo · vista de estadísticas */
 "use strict";
 
+const ADVANCED_SECS = new Set(["cross", "test", "prob"]);
 const SECTIONS = [["sum", "Resumen"], ["per", "Periodos"], ["freq", "Frecuencias"], ["rel", "Relación"], ["cross", "Tablas cruzadas"], ["test", "Contrastes"], ["prob", "Probabilidad"]];
 const EXPLAIN = {
   "Media": "La suma de todos los valores dividida entre cuántos hay.",
@@ -37,7 +38,8 @@ const sel = (key, list, val, rerender = true) => `<select data-st="${key}" ${rer
 
 function renderStats() {
   if (!cur()) return;
-  const s = st(), secs = SECTIONS.filter(x => x[0] !== "per" || cur().labelType === "date");
+  const s = st(), secs = SECTIONS.filter(x => (x[0] !== "per" || cur().labelType === "date") && (settings.advanced || !ADVANCED_SECS.has(x[0])));
+  const sl = summaryLine(); $("#sumLine").hidden = !sl; $("#sumLine").innerHTML = sl;
   s.section = secs.some(x => x[0] === s.section) ? s.section : "sum";
   $("#statsNav").innerHTML = secs.map(([k, n]) => `<button role="tab" data-sec="${k}" aria-selected="${k === s.section}">${t(n)}</button>`).join("");
   $("#explain").hidden = true;
@@ -81,13 +83,14 @@ function secSummary() {
   const c = s.sumCol === LABEL ? null : colById(s.sumCol);
   return `<div class="sel-row"><label>${t("Columna")} ${sel("sumCol", catList(), s.sumCol)}</label>${c && isNum(c) ? `<button class="btn small" data-sa="stepsSum">${t("Paso a paso")}</button>` : ""}</div>`;
 }
-function summaryRows(sd) {
+function summaryRows(sd, u = "") {
+  const f = (v, d) => withUnit(fmt(v, d), u);
   return [
-    ["Datos (n)", fmt(sd.n, 0)], ["Suma", fmt(sd.sum)], ["Media", fmt(sd.mean)], ["Mediana", fmt(sd.median)],
-    ["Moda", sd.mode.length ? sd.mode.slice(0, 3).map(x => fmt(x)).join(" · ") + (sd.mode.length > 3 ? "…" : "") : t("Sin moda")],
-    ["Mínimo", fmt(sd.min)], ["Máximo", fmt(sd.max)], ["Rango", fmt(sd.max - sd.min)],
-    ["Desviación típica", fmt(sd.sd)], ["Varianza", fmt(sd.variance)],
-    ["Q1 / Q3", `${fmt(sd.q1)} / ${fmt(sd.q3)}`], ["Rango intercuartílico", fmt(sd.iqr)],
+    ["Datos (n)", fmt(sd.n, 0)], ["Suma", f(sd.sum)], ["Media", f(sd.mean)], ["Mediana", f(sd.median)],
+    ["Moda", sd.mode.length ? sd.mode.slice(0, 3).map(x => f(x)).join(" · ") + (sd.mode.length > 3 ? "…" : "") : t("Sin moda")],
+    ["Mínimo", f(sd.min)], ["Máximo", f(sd.max)], ["Rango", f(sd.max - sd.min)],
+    ["Desviación típica", f(sd.sd)], ["Varianza", fmt(sd.variance)],
+    ["Q1 / Q3", `${f(sd.q1)} / ${f(sd.q3)}`], ["Rango intercuartílico", f(sd.iqr)],
     ["Coef. de variación", Number.isFinite(sd.cv) ? fmt(sd.cv, 1) + " %" : "—"],
     ["Valores atípicos", sd.outliers.length ? `<span class="warn">${sd.outliers.slice(0, 6).map(x => fmt(x)).join(" · ")}${sd.outliers.length > 6 ? "…" : ""}</span>` : t("Ninguno")]
   ];
@@ -104,7 +107,7 @@ function outSummary() {
   const s = st(), d = data(), c = s.sumCol === LABEL ? null : colById(s.sumCol);
   if (c && isNum(c)) {
     const v = d.vals(c.id);
-    $("#stOut").innerHTML = v.length ? dl(summaryRows(S.describe(v))) : `<p class="hint">${t("Esta serie no tiene números todavía.")}</p>`;
+    $("#stOut").innerHTML = v.length ? dl(summaryRows(S.describe(v), unitOf(c))) : `<p class="hint">${t("Esta serie no tiene números todavía.")}</p>`;
   } else {
     const list = S.countCategories(d.cat(s.sumCol)), tot = list.reduce((a, x) => a + x.n, 0);
     const mx = Math.max(0, ...list.map(x => x.n)), modes = list.filter(x => x.n === mx);
@@ -132,7 +135,7 @@ function outPeriods() {
   const ser = d.series(s.perCol), rng = periodRanges(s.perMode);
   const sets = rng.map(([a, b]) => ser.filter((v, k) => v != null && d.ts[k] >= a && d.ts[k] < b));
   const sum = v => (v.length ? S.describe(v) : null), A = sum(sets[0]), B = sum(sets[1]);
-  const f = (x, k) => (x ? fmt(x[k]) : "—");
+  const pu = unitOf(colById(s.perCol)), f = (x, k) => (x ? withUnit(fmt(x[k]), pu) : "—");
   const fd = ts => fmtDate(isoOf(new Date(ts)));
   let html = `<div class="twrap"><table class="freq"><thead><tr><th>${t("Periodo")}</th><th>n</th><th>${t("Media")}</th><th>${t("Mín")}</th><th>${t("Máx")}</th><th>${t("Total")}</th></tr></thead><tbody>
     ${rng.map(([a, b, n], i) => { const x = i ? B : A; return `<tr><td>${esc(n)}<br><small class="hint">${fd(a)} – ${fd(b - 864e5)}</small></td><td>${x ? x.n : 0}</td><td>${f(x, "mean")}</td><td>${f(x, "min")}</td><td>${f(x, "max")}</td><td>${f(x, "sum")}</td></tr>`; }).join("")}</tbody></table></div>`;
@@ -499,3 +502,54 @@ $("#copyStats").addEventListener("click", () => {
   if (lastReg && !lastReg.error) txt += `\n${t("Regresión")} ${t(lastReg.name)} (${nameOf(st().regX)} → ${nameOf(st().regY)})\n${lastReg.eq}\nR² = ${fmt(lastReg.r2, 4)}\n`;
   copyText(txt.trim()).then(ok => toast(ok ? t("Estadísticas copiadas") : t("No se pudo copiar")));
 });
+
+/* ---------- resumen en una frase ----------
+   Con fechas: últimos 7 o 30 días frente a los anteriores (ventanas móviles, para que sea justo aunque el mes vaya por la mitad).
+   Sin fechas: total (si son cantidades que se suman), mayor y menor. Sin verbos que supongan nada: solo más, menos y el número. */
+function summaryLine() {
+  const p = cur(), d = data(), s = st();
+  const nums = numCols().filter(c => d.vals(c.id).length >= 2);
+  const c = nums.find(x => x.id === s.sumCol) || nums[0];
+  if (!c) return "";
+  const u = unitOf(c), F = v => `<b>${esc(withUnit(fmt(v), u))}</b>`, agg = aggOf(c), name = esc(colName(c));
+  if (p.labelType === "date" && d.ts) {
+    const pts = d.series(c.id).map((v, k) => [d.ts[k], v]).filter(x => x[1] != null && Number.isFinite(x[0])).sort((a, b) => a[0] - b[0]);
+    if (pts.length < 2) return "";
+    const span = (pts[pts.length - 1][0] - pts[0][0]) / 864e5, W = span >= 45 ? 30 : span >= 10 ? 7 : 0;
+    if (!W) return "";
+    const now = new Date(); now.setHours(0, 0, 0, 0); const end = now.getTime() + 864e5, a = end - W * 864e5, b = end - 2 * W * 864e5;
+    const curr = pts.filter(x => x[0] >= a && x[0] < end).map(x => x[1]), prev = pts.filter(x => x[0] >= b && x[0] < a).map(x => x[1]);
+    const cmp = (vc, vp, keys) => {
+      if (vp == null) return t(keys[3], { n: W, v: F(vc) });
+      const df = vc - vp, cls = trendClass(df, vc, c);
+      const D = `<span class="${cls}">${esc(withUnit(fmt(Math.abs(df)), u))}</span>`;
+      return t(Math.abs(df) < 1e-9 ? keys[2] : df > 0 ? keys[0] : keys[1], { n: W, v: F(vc), d: D });
+    };
+    let txt;
+    if (agg === "last") {
+      const lastV = pts[pts.length - 1][1], before = pts.filter(x => x[0] < a).pop();
+      if (!before) return "";
+      txt = cmp(lastV, before[1], ["Ahora: {v}, {d} más que hace {n} días.", "Ahora: {v}, {d} menos que hace {n} días.", "Ahora: {v}, igual que hace {n} días.", ""]);
+    } else {
+      if (!curr.length) return "";
+      const fn = agg === "sum" ? S.sum : S.mean;
+      txt = cmp(fn(curr), prev.length ? fn(prev) : null, agg === "sum"
+        ? ["Últimos {n} días: total {v}, {d} más que los {n} anteriores.", "Últimos {n} días: total {v}, {d} menos que los {n} anteriores.", "Últimos {n} días: total {v}, igual que los {n} anteriores.", "Últimos {n} días: total {v}."]
+        : ["Últimos {n} días: media {v}, {d} más que los {n} anteriores.", "Últimos {n} días: media {v}, {d} menos que los {n} anteriores.", "Últimos {n} días: media {v}, igual que los {n} anteriores.", "Últimos {n} días: media {v}."]);
+    }
+    return nums.length > 1 ? `${name} · ${txt}` : txt;
+  }
+  const items = d.rowIdx.map((i, k) => ({ l: d.labels[k] || "#" + (i + 1), v: d.byId[c.id][i] })).filter(x => Number.isFinite(x.v));
+  if (items.length < 2) return "";
+  const vs = items.map(x => x.v), hi = items.reduce((m, x) => (x.v > m.v ? x : m)), lo = items.reduce((m, x) => (x.v < m.v ? x : m));
+  const parts = [];
+  if (agg === "sum") {
+    const tot = S.sum(vs); parts.push(t("Total: {t}.", { t: F(tot) }));
+    parts.push(vs.every(v => v >= 0) && tot > 0 ? t("Mayor: {a} ({v}, {p} del total).", { a: esc(hi.l), v: F(hi.v), p: withUnit(fmt((hi.v / tot) * 100, 0), "%") }) : t("Mayor: {a} ({v}).", { a: esc(hi.l), v: F(hi.v) }));
+  } else {
+    parts.push(t("Media: {m}.", { m: F(S.mean(vs)) }));
+    parts.push(t("Mayor: {a} ({v}).", { a: esc(hi.l), v: F(hi.v) }));
+  }
+  parts.push(t("Menor: {b} ({w}).", { b: esc(lo.l), w: F(lo.v) }));
+  return `${nums.length > 1 && !(agg !== "sum" && c.name === t("Media")) ? name + " · " : ""}${parts.join(" ")}`;
+}

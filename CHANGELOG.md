@@ -1,5 +1,20 @@
 # Registro de cambios de Gráficalo
 
+## 0.6 · 19 de octubre de 2026
+
+### Nuevo
+- **Tus proyectos en tarjetas**: al abrir la app se ven todos los proyectos con su último valor (o el total o la media), el cambio respecto al anterior y un minigráfico. Un toque abre el proyecto. El botón de arriba vuelve a las tarjetas y sustituye al desplegable de proyectos.
+- **Unidades en las columnas** (€, kg, %, h, km, min o la que escribas): se ven en la tabla, el registro rápido, las estadísticas, el panel y los gráficos (título del eje, etiquetas y tooltips). Las plantillas ya traen sus unidades.
+- **Resumen en una frase** encima de las estadísticas y en el panel:
+  - Con fechas: los últimos 7 o 30 días frente a los anteriores («Últimos 7 días: media 72,3 kg, 0,8 kg menos que los 7 anteriores»).
+  - Sin fechas: total, mayor y menor («Total: 1100 €. Mayor: Alquiler (550 €, 50 % del total). Menor: Otros (45 €)»).
+- **Botones de un toque** en el registro rápido para columnas de texto con pocas respuestas (Sí / No en Hábitos, momento del día en Glucosa, o las respuestas que ya hayas usado).
+- **Modo sencillo**: los contrastes de hipótesis, la probabilidad, las tablas cruzadas y las columnas con fórmulas quedan ocultos hasta activar «Modo avanzado» en Ajustes. Quien ya usaba la app lo conserva activado.
+
+### Cambiado
+- «Tema, idioma y PIN» pasa a llamarse «Ajustes».
+- Al borrar un proyecto se vuelve a la pantalla de proyectos.
+
 ## 0.5 · 19 de octubre de 2026
 
 ### Nuevo
