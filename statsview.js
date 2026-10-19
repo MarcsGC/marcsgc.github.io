@@ -36,6 +36,7 @@ function validCat(id, fb = 0) { const l = catList(); return l.some(c => c.id ===
 const sel = (key, list, val, rerender = true) => `<select data-st="${key}" ${rerender ? "data-rr" : ""}>${optList(list, val)}</select>`;
 
 function renderStats() {
+  if (!cur()) return;
   const s = st(), secs = SECTIONS.filter(x => x[0] !== "per" || cur().labelType === "date");
   s.section = secs.some(x => x[0] === s.section) ? s.section : "sum";
   $("#statsNav").innerHTML = secs.map(([k, n]) => `<button role="tab" data-sec="${k}" aria-selected="${k === s.section}">${t(n)}</button>`).join("");

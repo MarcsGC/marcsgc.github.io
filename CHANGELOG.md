@@ -1,5 +1,21 @@
 # Registro de cambios de Gráficalo
 
+## 0.5 · 19 de octubre de 2026
+
+### Nuevo
+- **Sincronización con Google Drive** (Menú → Sincronizar con Google Drive): los mismos proyectos en el móvil y en el ordenador. Se guardan en la carpeta oculta de la app en el Drive del usuario; sin servidores propios.
+  - Se sincroniza al abrir la app, tras cada cambio y al volver a ella.
+  - Si un proyecto se edita en dos dispositivos a la vez, se queda el cambio más reciente y se guarda una copia del otro.
+  - Los proyectos borrados se borran también en los demás dispositivos.
+  - Desconectar, con opción de borrar la copia de Drive.
+- **Pantalla de inicio** con las plantillas agrupadas (seguimiento diario, estudios, dinero y trabajo, otros), con icono y aviso de las que tienen registro rápido. Desde ahí también se pueden traer los proyectos de Google Drive o restaurar una copia.
+
+### Cambiado
+- La primera vez que se abre la app se muestra la pantalla de inicio en lugar de proyectos de ejemplo y el tutorial (sigue disponible en «Ver cómo funciona» y en el menú).
+- Al borrar todos los proyectos se vuelve a la pantalla de inicio; ya no se regeneran los ejemplos.
+- «Nuevo proyecto» usa el mismo selector agrupado de plantillas.
+- Política de privacidad actualizada con la sincronización con Google Drive.
+
 ## 0.4 · 16 de octubre de 2026
 
 ### Nuevo

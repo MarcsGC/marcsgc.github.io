@@ -15,6 +15,7 @@ const LABEL = "__label";
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const ICON = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const IC = {
+  cloud: '<path d="M7 18a4.5 4.5 0 01-.5-9A6 6 0 0118 8.5a4 4 0 01-.5 9.5H7z"/><path d="M9.5 13.5l2 2 3.5-3.5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   col: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18.5 10v4M16.5 12h4"/>',
   sort: '<path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/>', imp: '<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 19h14"/>',
@@ -179,7 +180,74 @@ const TEMPLATES = [
         [{ name: t("Respuestas"), type: "count", countCol: 1, countStyle: "doughnut", countPct: true, legend: "bottom" }, { name: t("Por curso"), type: "count", countCol: 0, splitCol: 1, countStyle: "stacked" }],
         { sumCol: 1, freqCol: 1, crossRow: 0, crossCol: 1, testKind: "groups", testA: 2, testG: 0, section: "cross" }); } }
 ];
-const samples = () => ["notas", "gastos", "diario", "encuesta", "relacion"].map(k => { const p = TEMPLATES.find(x => x.key === k).make(); p.name += " " + t("(ejemplo)"); return p; });
+/* Plantillas agrupadas e iconos para la pantalla de inicio y «Nuevo proyecto» */
+const TPL_GROUPS = [
+  [() => t("Seguimiento diario"), ["peso", "diario", "tension", "glucosa", "habitos", "ahorro"]],
+  [() => t("Estudios"), ["notas", "encuesta", "relacion"]],
+  [() => t("Dinero y trabajo"), ["gastos", "presupuesto", "ventas", "horas"]],
+  [() => t("Otros"), ["deporte", "blank"]]
+];
+const TPL_IC = {
+  peso: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 10.5a4 4 0 017 0M12 10.5l1.6-2.2"/>',
+  diario: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h3"/>',
+  tension: '<path d="M20.8 8.6a4.6 4.6 0 00-8.8-2 4.6 4.6 0 00-8.8 2c0 5.4 8.8 11 8.8 11s8.8-5.6 8.8-11z"/><path d="M6.5 12H9l1.5-2.5 2 4.5 1.5-2h3"/>',
+  glucosa: '<path d="M12 3s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/><path d="M9.5 14.5a2.5 2.5 0 002.5 2.5"/>',
+  habitos: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/>',
+  ahorro: '<circle cx="12" cy="12" r="8.5"/><path d="M14.5 9.5c-.5-1-1.4-1.5-2.5-1.5-1.4 0-2.5.8-2.5 2s1.1 1.6 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2c-1.1 0-2-.5-2.5-1.5M12 6.5V8M12 16v1.5"/>',
+  notas: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5M22 9v5"/>',
+  encuesta: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
+  relacion: '<path d="M4 4v16h16"/><circle cx="8.5" cy="15" r="1.3"/><circle cx="12" cy="11.5" r="1.3"/><circle cx="16.5" cy="8" r="1.3"/><circle cx="14.5" cy="13.5" r="1.3"/>',
+  gastos: '<path d="M11 3.5a8.5 8.5 0 108.5 9.5H11z"/><path d="M14 3.2A8.5 8.5 0 0120.8 10H14z"/>',
+  presupuesto: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 14.5h2"/>',
+  ventas: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  horas: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  deporte: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  blank: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>'
+};
+const QUICK_TPL = new Set(["peso", "tension", "glucosa", "habitos", "ahorro", "horas"]);
+function tplGrid() {
+  return TPL_GROUPS.map(([title, keys]) => `<section class="tplgroup"><h4>${esc(title())}</h4><div class="tpls">${keys.map(k => {
+    const x = TEMPLATES.find(y => y.key === k);
+    return `<button data-act="tpl:${k}"><span class="tplic">${ICON(TPL_IC[k] || TPL_IC.blank)}</span><span class="tpltx"><b>${esc(x.name())}</b><small>${esc(x.desc())}</small>${QUICK_TPL.has(k) ? `<em>${t("Registro rápido")}</em>` : ""}</span></button>`;
+  }).join("")}</div></section>`).join("");
+}
+function newFromTemplate(key) {
+  const x = TEMPLATES.find(y => y.key === key); if (!x) return;
+  const p = x.make();
+  let n = 2; const base = p.name; while (state.projects.some(q => q.name === p.name)) p.name = `${base} ${n++}`;
+  p.updated = Date.now();
+  if (!settings.tutorialDone) { settings.tutorialDone = true; saveSettings(); }
+  addProject(p); hideHome(); showView("view-data");
+  setTimeout(() => $(QUICK_TPL.has(key) ? "#quick [data-qc]" : "#tbody input")?.focus(), 120);
+}
+/* Pantalla de inicio: aparece cuando no hay ningún proyecto */
+function showHome() {
+  const h = $("#home");
+  h.innerHTML = `<div class="homein">
+    <div class="homebar"><div class="brand">${$(".brand svg").outerHTML}<span>Gráficalo</span></div>
+      <button class="btn icon" data-h="settings" title="${t("Tema, idioma y PIN")}">${ICON('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z"/>')}</button></div>
+    <div class="hero"><h1>${t("¿Qué quieres medir?")}</h1><p>${t("Elige una plantilla para empezar. Después podrás cambiar las columnas, los gráficos y todo lo demás.")}</p></div>
+    ${tplGrid()}
+    <section class="homealt"><h4>${t("¿Ya usas Gráficalo en otro dispositivo?")}</h4>
+      <div class="homebtns">
+        <button class="btn" data-h="sync">${ICON('<path d="M7 18a4.5 4.5 0 01-.5-9A6 6 0 0118 8.5a4 4 0 01-.5 9.5"/><path d="M12 12v7M9 16l3 3 3-3"/>')}${t("Traer mis proyectos de Google Drive")}</button>
+        <button class="btn" data-h="restore">${ICON(IC.imp)}${t("Restaurar una copia de seguridad")}</button>
+      </div>
+      <button class="linkbtn" data-h="tutorial">${t("Ver cómo funciona")}</button>
+    </section></div>`;
+  h.hidden = false; document.body.classList.add("athome");
+  h.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.act?.startsWith("tpl:")) return newFromTemplate(b.dataset.act.slice(4));
+    const k = b.dataset.h;
+    if (k === "settings") settingsSheet();
+    if (k === "restore") $("#backupIn").click();
+    if (k === "tutorial") showOnboarding();
+    if (k === "sync") typeof syncSheet === "function" ? syncSheet() : toast(t("No disponible"));
+  };
+  $("#undoBtn").disabled = $("#redoBtn").disabled = true;
+}
+function hideHome() { $("#home").hidden = true; document.body.classList.remove("athome"); }
 
 /* migraciones */
 function upgradeV2(p) {
@@ -207,16 +275,17 @@ const load = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { 
 let state;
 function initState() {
   state = load(KEY);
-  if (!state || !Array.isArray(state.projects) || !state.projects.length) {
+  if (!state || !Array.isArray(state.projects)) {
     const v2 = load("graficalo.v2"), v1 = load("graficalo.v1");
     if (v2 && Array.isArray(v2.projects) && v2.projects.length) state = { projects: v2.projects.map(upgradeProject), current: v2.current };
     else if (v1 && Array.isArray(v1.projects) && v1.projects.length) state = { projects: migrateV1(v1), current: null };
-    else state = { projects: samples(), current: null };
+    else state = { projects: [], current: null };
   } else state.projects = state.projects.map(upgradeProject);
-  if (!state.projects.find(p => p.id === state.current)) state.current = state.projects[0].id;
+  state.deleted = state.deleted || {};
+  if (!state.projects.find(p => p.id === state.current)) state.current = state.projects[0]?.id || null;
 }
 const cur = () => state.projects.find(p => p.id === state.current);
-const saveNow = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { toast(t("No se han podido guardar los cambios: el almacenamiento está lleno.")); } };
+const saveNow = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { toast(t("No se han podido guardar los cambios: el almacenamiento está lleno.")); } if (typeof syncSoon === "function" && syncOn()) syncSoon(); };
 const saveSoon = debounce(saveNow, 250);
 function persist() { const p = cur(); if (p) p.updated = Date.now(); saveSoon(); trackSoon(); }
 // verde si el cambio acerca al objetivo, rojo si aleja; sin objetivo, neutro
@@ -232,8 +301,9 @@ function trendClass(diff, last, c) {
 const HIST = {};
 const snapFields = ["name", "labelName", "labelType", "cols", "rows", "charts", "filters", "palette", "goal", "bodyWeight", "height", "unit"];
 const snap = p => JSON.stringify(snapFields.map(k => p[k]));
-const hist = () => (HIST[state.current] = HIST[state.current] || { past: [], future: [], last: snap(cur()) });
+const hist = () => cur() ? (HIST[state.current] = HIST[state.current] || { past: [], future: [], last: snap(cur()) }) : { past: [], future: [], last: "" };
 function track() {
+  if (!cur()) return;
   const h = hist(), s = snap(cur());
   if (s === h.last) return;
   h.past.push(h.last); if (h.past.length > 80) h.past.shift();
@@ -330,17 +400,14 @@ function renderProjects() {
   $("#projectSel").innerHTML = state.projects.map(p => `<option value="${p.id}" ${p.id === state.current ? "selected" : ""}>${esc(p.name)}</option>`).join("");
 }
 $("#projectSel").addEventListener("change", e => { track(); state.current = e.target.value; hist(); dirty(); saveNow(); renderAll(); });
-function addProject(p) { track(); state.projects.push(p); state.current = p.id; hist(); dirty(); saveNow(); renderAll(); }
+function addProject(p) { track(); p.updated = p.updated || Date.now(); state.projects.push(p); state.current = p.id; hist(); dirty(); saveNow(); renderAll(); }
 $("#newProject").addEventListener("click", () => {
   openSheet(`<h3>${t("Nuevo proyecto")}</h3><p class="hint">${t("Elige una plantilla. Las que traen datos los tienen de ejemplo: cámbialos por los tuyos.")}</p>
-    <div class="tpls">${TEMPLATES.map(x => `<button data-act="tpl:${x.key}"><b>${esc(x.name())}</b><small>${esc(x.desc())}</small></button>`).join("")}</div>
+    <div class="tplwrap">${tplGrid()}</div>
     <div class="actions"><button class="btn ghost" data-act="close">${t("Cancelar")}</button></div>`,
   act => {
     if (!act.startsWith("tpl:")) return;
-    const x = TEMPLATES.find(y => y.key === act.slice(4)), p = x.make();
-    let n = 2; const base = p.name; while (state.projects.some(q => q.name === p.name)) p.name = `${base} ${n++}`;
-    addProject(p); closeSheet(); showView("view-data");
-    setTimeout(() => $("#tbody input")?.focus(), 80);
+    closeSheet(); newFromTemplate(act.slice(4));
   });
 });
 $("#undoBtn").addEventListener("click", undo);
@@ -377,6 +444,7 @@ function openMenu() {
     <div class="menulist">
       ${menuItem("backup", IC.save, t("Guardar copia de seguridad"), t("Todos tus proyectos en un archivo"))}
       ${menuItem("restore", IC.restore, t("Restaurar copia de seguridad"))}
+      ${gdEnabled() ? menuItem("sync", IC.cloud, t("Sincronizar con Google Drive"), syncMenuSub()) : ""}
       ${menuItem("settings", IC.sun, t("Tema, idioma y PIN"))}
       ${menuItem("grades", '<path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-7"/>', t("¿Qué nota necesito?"), t("Calcula la nota que te hace falta en el próximo examen"))}
       ${menuItem("news", '<path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.6 7.1 18.2 8 12.7 4 8.8 9.5 8z"/>', t("Novedades"))}
@@ -399,8 +467,9 @@ function openMenu() {
     if (act === "delete") confirmSheet(t("Borrar proyecto"), t("¿Borrar «{name}» y todos sus datos? No se puede deshacer.", { name: p.name }), t("Borrar"), () => {
       delete HIST[p.id];
       state.projects = state.projects.filter(x => x.id !== p.id);
-      if (!state.projects.length) state.projects = samples();
-      state.current = state.projects[0].id; hist(); dirty(); saveNow(); renderAll(); toast(t("Proyecto borrado"));
+      state.deleted[p.id] = Date.now();
+      state.current = state.projects[0]?.id || null; hist(); dirty(); saveNow(); renderAll(); toast(t("Proyecto borrado"));
+      
     });
     if (act === "backup") backupSheet();
     if (act === "restore") $("#backupIn").click();
@@ -408,6 +477,7 @@ function openMenu() {
     if (act === "tutorial") { closeSheet(); showOnboarding(); }
     if (act === "about") aboutSheet();
     if (act === "grades") gradeSheet();
+    if (act === "sync") syncSheet();
     if (act === "news") whatsNewSheet(true);
     if (act === "feedback") feedbackSheet();
     if (act === "rate") rateSheet(true);
@@ -465,12 +535,13 @@ function aboutSheet() {
     <p class="hint"><a href="privacidad.html" target="_blank" rel="noopener" style="color:var(--accent)">${t("Política de privacidad")}</a></p>
     <div class="actions"><button class="btn primary" data-act="close">${t("Cerrar")}</button></div>`, () => {});
 }
-const APP_VERSION = "0.4";
+const APP_VERSION = "0.5";
 
 /* =========================================================
    Tabla de datos
    ========================================================= */
 function renderTable() {
+  if (!cur()) return;
   const p = cur(), d = data(), inSet = new Set(d.rowIdx);
   const lt = p.labelType === "date";
   $("#thead").innerHTML = `<tr><th class="num-col">#</th>
@@ -1079,7 +1150,7 @@ function convertUnit(p, col, to) {
 });
 function openQuickFromShortcut() {
   const dated = state.projects.filter(p => p.labelType === "date" && p.cols.length).sort((a, b) => (b.updated || 0) - (a.updated || 0));
-  const target = (cur().labelType === "date" ? cur() : null) || dated[0];
+  const target = (cur()?.labelType === "date" ? cur() : null) || dated[0];
   if (!target) return;
   if (target !== cur()) { state.current = target.id; hist(); dirty(); renderAll(); }
   showView("view-data"); setTimeout(() => { const i = $("#quick [data-qc]"); i?.focus(); }, 150);
@@ -1088,5 +1159,5 @@ function openQuickFromShortcut() {
 /* =========================================================
    Ciclo de renderizado
    ========================================================= */
-function refresh() { updateCount(); renderQuick(); renderChartUI(); renderStats(); if (currentView === "view-panel") renderPanel(); }
-function renderAll() { dirty(); renderProjects(); renderTable(); refresh(); updateUndo(); }
+function refresh() { if (!cur()) return; updateCount(); renderQuick(); renderChartUI(); renderStats(); if (currentView === "view-panel") renderPanel(); }
+function renderAll() { dirty(); if (!cur()) { renderProjects(); showHome(); return; } if (!$("#home").hidden) hideHome(); renderProjects(); renderTable(); refresh(); updateUndo(); }

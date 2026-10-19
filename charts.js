@@ -404,6 +404,7 @@ function typeSheet() {
 function chips(list, isOn, attr) { return `<div class="chips">${list.map(c => `<button data-${attr}="${c.id}" aria-pressed="${isOn(c.id)}"><i style="background:${colColor(c)}"></i>${esc(colName(c))}</button>`).join("")}</div>`; }
 function colSelect(id, value, list, extra = "") { return `<select id="${id}">${extra}${list.map(c => `<option value="${c.id}" ${c.id === value ? "selected" : ""}>${esc(c.id === LABEL ? colName(LABEL) : `${L(cur().cols.indexOf(c))} · ${colName(c)}`)}</option>`).join("")}</select>`; }
 function renderChartControls() {
+  if (!cur()) return;
   const p = cur(), ch = activeChart(), nums = numCols();
   ch.series = ch.series.filter(id => nums.some(c => c.id === id));
   ch.one = validId(ch.one || ch.series[0], 0);
@@ -470,6 +471,7 @@ $("#opts").addEventListener("change", e => {
 $("#opts").addEventListener("input", e => { if (e.target.id !== "optBins") return; const v = parseInt(e.target.value, 10); activeChart().bins = v >= 2 && v <= 40 ? v : null; persist(); renderChartSoon(); });
 const renderChartSoon = debounce(() => renderChart(), 150);
 function renderChart() {
+  if (!cur()) return;
   if (mainChart) { mainChart.destroy(); mainChart = null; }
   $("#zoomReset").hidden = true;
   const ch = activeChart(); $("#chart").setAttribute("aria-label", ch.name);
@@ -554,6 +556,7 @@ document.addEventListener("fullscreenchange", () => { if (!document.fullscreenEl
 let panelCharts = [];
 function destroyPanel() { panelCharts.forEach(c => c.destroy()); panelCharts = []; }
 function renderPanel() {
+  if (!cur()) return;
   destroyPanel();
   const p = cur(), d = data();
   renderChartTitle(); updateCount();
@@ -611,4 +614,4 @@ function imageSheet(theme) {
     if (act === "share") shareFile(await dataURLtoBlob(url), name, ch.title || ch.name);
   });
 }
-window.addEventListener("resize", debounce(() => { const w = wide(); if (w !== renderChart._w) { renderChart._w = w; renderChartControls(); renderChart(); } }, 200));
+window.addEventListener("resize", debounce(() => { if (!cur()) return; const w = wide(); if (w !== renderChart._w) { renderChart._w = w; renderChartControls(); renderChart(); } }, 200));

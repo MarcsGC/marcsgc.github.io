@@ -46,11 +46,13 @@ $("#backupIn").addEventListener("change", async e => {
     act => {
       if (act === "add") {
         const ids = new Set(state.projects.map(p => p.id));
-        projects.forEach(p => { if (ids.has(p.id)) p.id = uid(); state.projects.push(p); });
+        projects.forEach(p => { if (ids.has(p.id)) p.id = uid(); p.updated = Date.now(); state.projects.push(p); });
         state.current = projects[0].id; hist(); dirty(); saveNow(); renderAll(); closeSheet(); toast(t("{n} proyectos restaurados", { n: projects.length }));
       }
       if (act === "replace") confirmSheet(t("Reemplazar todos"), t("Se borrarán tus {n} proyectos actuales y se sustituirán por los de la copia. No se puede deshacer.", { n: state.projects.length }), t("Reemplazar"), () => {
         Object.keys(HIST).forEach(k => delete HIST[k]);
+        const keep = new Set(projects.map(p => p.id)); state.projects.forEach(p => { if (!keep.has(p.id)) (state.deleted = state.deleted || {})[p.id] = Date.now(); });
+        projects.forEach(p => (p.updated = Date.now()));
         state.projects = projects; state.current = projects[0].id; hist(); dirty(); saveNow(); renderAll(); toast(t("{n} proyectos restaurados", { n: projects.length }));
       });
     });

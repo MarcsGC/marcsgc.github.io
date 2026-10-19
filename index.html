@@ -45,6 +45,7 @@ header.top{display:flex;align-items:center;gap:6px;padding-block:4px 14px}
 .brand{font-family:var(--display);font-weight:800;font-size:1.45rem;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;flex-shrink:0;margin-right:4px}
 .brand svg{width:28px;height:28px;display:block}
 .brand span{display:none}
+.homebar .brand span{display:inline}
 @media (min-width:640px){.brand span{display:inline}}
 .project{display:flex;gap:6px;align-items:center;min-width:0;flex:1}
 .project select{min-width:0;flex:1;max-width:340px}
@@ -238,7 +239,29 @@ details.help summary{cursor:pointer;color:var(--accent);font-size:.88rem}
 details.help ul{margin:8px 0 0;padding-left:18px;font-size:.86rem;color:var(--muted)}
 details.help code{font-family:var(--mono);color:var(--ink)}
 .tpls{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-.tpls button{border:1px solid var(--line);background:var(--sheet);border-radius:10px;padding:12px;text-align:left;display:flex;flex-direction:column;gap:3px}
+.tpls button{border:1px solid var(--line);background:var(--sheet);border-radius:12px;padding:12px;text-align:left;display:flex;gap:11px;align-items:flex-start}
+.tpls .tplic{flex:none;width:38px;height:38px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.tpls .tplic svg{width:22px;height:22px}
+.tpls .tpltx{display:flex;flex-direction:column;gap:3px;min-width:0}
+.tpls em{font-style:normal;font-size:.72rem;font-weight:600;color:var(--amber);letter-spacing:.02em}
+.tplgroup h4{margin:18px 0 8px;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.tplwrap .tplgroup:first-child h4{margin-top:4px}
+.home{position:fixed;inset:0;z-index:20;overflow-y:auto;background:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px}
+.homein{max-width:880px;margin:0 auto;padding:12px max(16px,env(safe-area-inset-left,0px)) calc(32px + env(safe-area-inset-bottom,0px))}
+.homebar{display:flex;align-items:center;justify-content:space-between;padding-block:4px 6px}
+.hero{padding:18px 0 4px}
+.hero h1{margin:0 0 6px;font-family:var(--display);font-weight:800;font-size:clamp(1.8rem,7vw,2.6rem);letter-spacing:-.02em;line-height:1.05}
+.hero p{margin:0;color:var(--muted);max-width:52ch}
+.home .tpls{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.home .tpls button{padding:14px;box-shadow:0 1px 0 var(--line)}
+.home .tpls button:active{transform:scale(.99)}
+.homealt{margin-top:26px;background:var(--sheet);border:1px solid var(--line);border-radius:14px;padding:16px}
+.homealt h4{margin:0 0 12px;font-size:1rem;font-weight:600}
+.homebtns{display:flex;flex-wrap:wrap;gap:8px}
+.homebtns .btn{flex:1 1 220px;justify-content:flex-start;white-space:normal;text-align:left;padding:11px 14px}
+.linkbtn{background:none;border:0;color:var(--accent);font-weight:600;padding:12px 0 0;text-decoration:underline;text-underline-offset:3px}
+body.athome .app{visibility:hidden}
 .tpls button:hover{border-color:var(--accent)}
 .tpls b{font-weight:600}
 .tpls small{color:var(--muted);font-size:.8rem;line-height:1.3}
@@ -413,6 +436,7 @@ details.help code{font-family:var(--mono);color:var(--ink)}
   <div class="box"><canvas id="fsChart"></canvas></div>
   <p class="hint" id="fsHint" style="text-align:center"></p>
 </div>
+<div class="home" id="home" hidden></div>
 <div class="onb" id="onb" hidden></div>
 <div class="lock" id="lock" hidden></div>
 <div class="toast" id="toast" hidden></div>
@@ -432,6 +456,7 @@ details.help code{font-family:var(--mono);color:var(--ink)}
 <script src="export.js"></script>
 <script src="ocr.js"></script>
 <script src="extras.js"></script>
+<script src="sync.js"></script>
 <script src="main.js"></script>
 
 </body>

@@ -98,7 +98,7 @@ $("#lock").addEventListener("click", async e => {
   const k = e.target.closest("[data-k]"), l = e.target.closest("[data-l]");
   if (l?.dataset.l === "forgot") return drawLock("", true);
   if (l?.dataset.l === "back") return drawLock();
-  if (l?.dataset.l === "wipe") { try { [KEY, "graficalo.v2", "graficalo.v1"].forEach(k => localStorage.removeItem(k)); } catch {} delete settings.pin; saveSettings(); location.reload(); return; }
+  if (l?.dataset.l === "wipe") { try { [KEY, "graficalo.v2", "graficalo.v1", "graficalo.gdtoken"].forEach(k => localStorage.removeItem(k)); } catch {} delete settings.pin; delete settings.sync; saveSettings(); location.reload(); return; }
   if (l?.dataset.l === "del") { lockBuf = lockBuf.slice(0, -1); return drawLock(); }
   if (!k) return;
   if (Date.now() < lockUntil) return drawLock(t("Demasiados intentos. Espera unos segundos."));
@@ -114,6 +114,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) hidde
 
 /* ---------- novedades ---------- */
 const WHATS_NEW = {
+  "0.5": ["Sincroniza tus proyectos entre el móvil y el ordenador con Google Drive (Menú → Sincronizar con Google Drive).", "Nueva pantalla de inicio para elegir con qué plantilla empezar, con las plantillas agrupadas.", "Al borrar todos los proyectos ya no vuelven a aparecer los ejemplos."],
   "0.4": ["Tendencia y media de 7 días en los gráficos de evolución, y fecha estimada para llegar a tu objetivo.", "IMC y cambio entre kg y lb en el registro de peso.", "Compara esta semana con la anterior, o este mes con el pasado (Estadísticas → Periodos).", "«¿Qué nota necesito?» en el menú, y media ponderada en las fórmulas.", "Plantillas nuevas: presupuesto anual, hucha de ahorro, tensión, glucosa, horas de trabajo y hábitos.", "Bloqueo con PIN, y envío de sugerencias desde el menú."],
   "0.3": ["Ahora en 7 idiomas.", "Registro rápido: escribe el valor y la fecha se pone sola."]
 };
