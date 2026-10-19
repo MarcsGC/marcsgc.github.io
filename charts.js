@@ -180,8 +180,9 @@ function buildConfig(ch, mode = "main") {
   };
   const labels = d.labels, sel = ch.series.map(colById).filter(c => c && isNum(c));
   const useTime = (ch.type === "line" || ch.type === "area") && d.ts && d.ts.length > 1 && d.ts.every(Number.isFinite);
+  let xMaxExtra = -Infinity;
   const timeAxis = () => {
-    const xs = d.ts, mn = Math.min(...xs), mx = Math.max(...xs), day = 864e5;
+    const xs = d.ts, mn = Math.min(...xs), mx = Math.max(Math.max(...xs), xMaxExtra), day = 864e5;
     Object.assign(base.scales.x, {
       type: "linear", min: mn, max: mx, ticks: { color: muted, maxRotation: 0, callback: v => fmtDate(isoOf(new Date(v)), data.multiYear) },
       afterBuildTicks: sc => { const days = Math.round((mx - mn) / day), step = Math.max(1, Math.ceil(days / 7)); const out = []; for (let v = mn; v <= mx + 1; v += step * day) out.push({ value: v }); sc.ticks = out; }
@@ -207,6 +208,21 @@ function buildConfig(ch, mode = "main") {
     if (ch.showMean && ["bar", "line", "area"].includes(ch.type)) sel.forEach(c => { const m = meanDs(c, colColor(c)); if (m) ds.push(m); });
     if (ch.type === "barh") { base.indexAxis = "y"; base.scales.x.beginAtZero = ch.zero !== false; base.scales.x.ticks.font = { family: css("--mono") }; delete base.scales.y.ticks.font; base.scales.y.beginAtZero = false; }
     if (ch.type === "stacked") { base.scales.x.stacked = true; base.scales.y.stacked = true; }
+    if (useTime && (ch.ma7 || ch.trend)) {
+      const firstNum = numCols()[0];
+      sel.forEach(c => {
+        const sr = d.series(c.id), pts = d.ts.map((x, k) => [x, sr[k]]).filter(q => q[1] != null).sort((a, b) => a[0] - b[0]);
+        const tag = sel.length > 1 ? " · " + colName(c) : "";
+        if (ch.ma7 && pts.length > 2) ds.push({ type: "line", label: t("Media 7 días") + tag, data: pts.map(([x]) => ({ x, y: S.mean(pts.filter(q => q[0] > x - 7 * 864e5 && q[0] <= x).map(q => q[1])) })), borderColor: alpha(colColor(c), 0.75), borderWidth: 3, pointRadius: 0, fill: false, tension: 0.35, _noLabels: true });
+        const tr = ch.trend ? trendInfo(c.id) : null;
+        if (tr) {
+          const end = Math.min(Math.max(tr.lastTs + 14 * 864e5, c === firstNum && tr.eta ? tr.eta : 0), tr.lastTs + 180 * 864e5);
+          xMaxExtra = Math.max(xMaxExtra, end);
+          const line = []; for (let k = 0; k <= 20; k++) { const x = tr.fromTs + ((end - tr.fromTs) * k) / 20; line.push({ x, y: tr.at(x / 864e5) }); }
+          ds.push({ type: "line", label: t("Tendencia") + tag, data: line, borderColor: css("--amber"), borderDash: [7, 5], borderWidth: 2, pointRadius: 0, fill: false, _noLabels: true });
+        }
+      });
+    }
     if (useTime) timeAxis();
     if (sel.length === 1 && ds.length === 1) legend.display = false;
     annot(ch.type === "barh");
@@ -415,6 +431,7 @@ function renderChartControls() {
   const o = [];
   if (["bar", "line", "area", "combo"].includes(ch.type)) o.push(`<label><input type="checkbox" id="optMean" ${ch.showMean ? "checked" : ""}> ${t("Línea de la media")}</label>`);
   if (["bar", "barh", "stacked", "line", "area", "combo", "pie", "doughnut", "count"].includes(ch.type)) o.push(`<label><input type="checkbox" id="optValues" ${ch.showValues ? "checked" : ""}> ${t("Mostrar valores")}</label>`);
+  if ((ch.type === "line" || ch.type === "area") && p.labelType === "date") o.push(`<label><input type="checkbox" id="optMa" ${ch.ma7 ? "checked" : ""}> ${t("Media 7 días")}</label>`, `<label><input type="checkbox" id="optTrend" ${ch.trend ? "checked" : ""}> ${t("Tendencia")}</label>`);
   if (ch.type === "hist") o.push(`<label>${t("Intervalos")} <input type="number" id="optBins" min="2" max="40" placeholder="auto" value="${ch.bins || ""}"></label>`);
   if (CARTESIAN.includes(ch.type) && !(ch.type === "count" && ["pie", "doughnut"].includes(ch.countStyle))) o.push(`<span class="hint">${wide() ? t("Ctrl + rueda para ampliar") : t("Pantalla completa para ampliar")}</span>`);
   $("#opts").innerHTML = o.join("");
@@ -446,6 +463,8 @@ $("#opts").addEventListener("change", e => {
   const ch = activeChart();
   if (e.target.id === "optMean") ch.showMean = e.target.checked;
   if (e.target.id === "optValues") ch.showValues = e.target.checked;
+  if (e.target.id === "optMa") ch.ma7 = e.target.checked;
+  if (e.target.id === "optTrend") ch.trend = e.target.checked;
   persist(); renderChart();
 });
 $("#opts").addEventListener("input", e => { if (e.target.id !== "optBins") return; const v = parseInt(e.target.value, 10); activeChart().bins = v >= 2 && v <= 40 ? v : null; persist(); renderChartSoon(); });

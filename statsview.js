@@ -1,7 +1,7 @@
 /* Gráficalo · vista de estadísticas */
 "use strict";
 
-const SECTIONS = [["sum", "Resumen"], ["freq", "Frecuencias"], ["rel", "Relación"], ["cross", "Tablas cruzadas"], ["test", "Contrastes"], ["prob", "Probabilidad"]];
+const SECTIONS = [["sum", "Resumen"], ["per", "Periodos"], ["freq", "Frecuencias"], ["rel", "Relación"], ["cross", "Tablas cruzadas"], ["test", "Contrastes"], ["prob", "Probabilidad"]];
 const EXPLAIN = {
   "Media": "La suma de todos los valores dividida entre cuántos hay.",
   "Mediana": "El valor que queda en el centro al ordenarlos. Le afectan poco los valores extremos.",
@@ -36,15 +36,16 @@ function validCat(id, fb = 0) { const l = catList(); return l.some(c => c.id ===
 const sel = (key, list, val, rerender = true) => `<select data-st="${key}" ${rerender ? "data-rr" : ""}>${optList(list, val)}</select>`;
 
 function renderStats() {
-  const s = st(); s.section = SECTIONS.some(x => x[0] === s.section) ? s.section : "sum";
-  $("#statsNav").innerHTML = SECTIONS.map(([k, n]) => `<button role="tab" data-sec="${k}" aria-selected="${k === s.section}">${t(n)}</button>`).join("");
+  const s = st(), secs = SECTIONS.filter(x => x[0] !== "per" || cur().labelType === "date");
+  s.section = secs.some(x => x[0] === s.section) ? s.section : "sum";
+  $("#statsNav").innerHTML = secs.map(([k, n]) => `<button role="tab" data-sec="${k}" aria-selected="${k === s.section}">${t(n)}</button>`).join("");
   $("#explain").hidden = true;
   const nav = $("#statsNav"), on = nav.querySelector("[aria-selected=true]"); if (on) nav.scrollLeft = on.offsetLeft - (nav.clientWidth - on.offsetWidth) / 2;
-  const fn = { sum: secSummary, freq: secFreq, rel: secRel, cross: secCross, test: secTest, prob: secProb }[s.section];
+  const fn = { per: secPeriods, sum: secSummary, freq: secFreq, rel: secRel, cross: secCross, test: secTest, prob: secProb }[s.section];
   $("#statsBody").innerHTML = fn() + `<div id="stOut" class="sblock"></div>`;
   renderStatsOut();
 }
-function renderStatsOut() { const s = st(); const fn = { sum: outSummary, freq: outFreq, rel: outRel, cross: outCross, test: outTest, prob: outProb }[s.section]; fn(); }
+function renderStatsOut() { const s = st(); const fn = { per: outPeriods, sum: outSummary, freq: outFreq, rel: outRel, cross: outCross, test: outTest, prob: outProb }[s.section]; fn(); }
 $("#statsNav").addEventListener("click", e => { const b = e.target.closest("[data-sec]"); if (!b) return; st().section = b.dataset.sec; saveSoon(); renderStats(); });
 $("#statsBody").addEventListener("change", e => onStatInput(e, true));
 $("#statsBody").addEventListener("input", e => { if (e.target.matches("input[type=text],input[type=number]")) onStatInput(e, false); });
@@ -108,6 +109,38 @@ function outSummary() {
     const mx = Math.max(0, ...list.map(x => x.n)), modes = list.filter(x => x.n === mx);
     $("#stOut").innerHTML = (tot ? dl([["Datos (n)", fmt(tot, 0)], ["Categorías", fmt(list.length, 0)], ["Moda", esc(modes.slice(0, 3).map(x => d.catDisplay(s.sumCol, x.key)).join(" · ")) + ` (${mx})`, "txt"]]) : "") + catTable(s.sumCol);
   }
+}
+
+
+/* ---------- comparar periodos (proyectos con fechas) ---------- */
+function secPeriods() {
+  const s = st(), nums = numList();
+  if (!nums.length) return `<p class="hint">${t("Hace falta al menos una columna de números.")}</p>`;
+  s.perCol = validId(s.perCol, 0); s.perMode = s.perMode || "week";
+  return `<div class="sel-row"><label>${t("Serie")} ${sel("perCol", nums, s.perCol)}</label></div>
+    <div class="setrow">${seg("perMode", [["week", t("Semana")], ["month", t("Mes")], ["d30", t("30 días")]], s.perMode)}</div>`;
+}
+function periodRanges(mode) {
+  const now = new Date(); now.setHours(0, 0, 0, 0); const day = 864e5, T = now.getTime();
+  if (mode === "week") { const dow = (now.getDay() + 6) % 7, start = T - dow * day; return [[start, start + 7 * day, t("Esta semana")], [start - 7 * day, start, t("Semana anterior")]]; }
+  if (mode === "month") { const a = new Date(now.getFullYear(), now.getMonth(), 1).getTime(), b = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime(), c = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(); return [[a, b, t("Este mes")], [c, a, t("Mes anterior")]]; }
+  return [[T - 29 * day, T + day, t("Últimos 30 días")], [T - 59 * day, T - 29 * day, t("30 días anteriores")]];
+}
+function outPeriods() {
+  const s = st(), d = data(); if (!numList().length || !d.ts) return;
+  const ser = d.series(s.perCol), rng = periodRanges(s.perMode);
+  const sets = rng.map(([a, b]) => ser.filter((v, k) => v != null && d.ts[k] >= a && d.ts[k] < b));
+  const sum = v => (v.length ? S.describe(v) : null), A = sum(sets[0]), B = sum(sets[1]);
+  const f = (x, k) => (x ? fmt(x[k]) : "—");
+  const fd = ts => fmtDate(isoOf(new Date(ts)));
+  let html = `<div class="twrap"><table class="freq"><thead><tr><th>${t("Periodo")}</th><th>n</th><th>${t("Media")}</th><th>${t("Mín")}</th><th>${t("Máx")}</th><th>${t("Total")}</th></tr></thead><tbody>
+    ${rng.map(([a, b, n], i) => { const x = i ? B : A; return `<tr><td>${esc(n)}<br><small class="hint">${fd(a)} – ${fd(b - 864e5)}</small></td><td>${x ? x.n : 0}</td><td>${f(x, "mean")}</td><td>${f(x, "min")}</td><td>${f(x, "max")}</td><td>${f(x, "sum")}</td></tr>`; }).join("")}</tbody></table></div>`;
+  if (A && B) {
+    const diff = A.mean - B.mean, pc = B.mean ? (diff / Math.abs(B.mean)) * 100 : NaN, cls = trendClass(diff, A.mean, colById(s.perCol));
+    html += `<div class="verdict ${cls === "up" ? "yes" : ""}"><b><span class="${cls}">${diff > 0 ? "▲" : diff < 0 ? "▼" : "="} ${fmt(Math.abs(diff))}</span> ${t("de diferencia en la media")}</b>
+      <p>${t("{a}: media {x} · {b}: media {y}", { a: rng[0][2], x: fmt(A.mean), b: rng[1][2], y: fmt(B.mean) })}${Number.isFinite(pc) ? ` (${pc > 0 ? "+" : ""}${fmt(pc, 1)} %)` : ""}</p></div>`;
+  } else html += `<p class="hint">${t("Hacen falta datos en los dos periodos para compararlos.")}</p>`;
+  $("#stOut").innerHTML = html;
 }
 
 /* ---------- frecuencias ---------- */

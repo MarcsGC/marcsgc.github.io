@@ -186,8 +186,9 @@
   const ROW_FN = {
     abs: "Math.abs", raiz: "Math.sqrt", sqrt: "Math.sqrt", ln: "Math.log", log: "Math.log10", exp: "Math.exp",
     redondear: "F.round", round: "F.round", pot: "Math.pow", pow: "Math.pow", min: "F.min", max: "F.max",
-    si: "F.si", if: "F.si"
+    si: "F.si", if: "F.si", ponderada: "F.wavg", wavg: "F.wavg"
   };
+  const COL2_FN = { mediap: 1, wmean: 1 };
   const COL_FN = {
     suma: "sum", sum: "sum", total: "sum", media: "mean", promedio: "mean", mean: "mean", avg: "mean",
     mediana: "median", median: "median", desv: "sd", sd: "sd", contar: "n", count: "n", min: "min", max: "max"
@@ -195,7 +196,8 @@
   const F = {
     round: (x, d) => { const p = Math.pow(10, d || 0); return Math.round(x * p) / p; },
     min: (...a) => Math.min(...a), max: (...a) => Math.max(...a),
-    si: (c, a, b) => (c ? a : b)
+    si: (c, a, b) => (c ? a : b),
+    wavg: (...a) => { let sv = 0, sw = 0; for (let i = 0; i + 1 < a.length; i += 2) { if (Number.isFinite(a[i]) && Number.isFinite(a[i + 1])) { sv += a[i] * a[i + 1]; sw += a[i + 1]; } } return sw ? sv / sw : NaN; }
   };
   const letterIndex = s => [...s].reduce((n, ch) => n * 26 + (ch.charCodeAt(0) - 64), 0) - 1;
   const indexLetter = i => { let s = ""; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
@@ -241,6 +243,11 @@
             const idx = colRef(next().v); next();
             return `AG(${idx},"${COL_FN[low]}")`;
           }
+          // media ponderada de una columna con los pesos de otra: mediap(A; B)
+          if (COL2_FN[low] && toks[i] && /^[A-Z]{1,2}$/.test(toks[i].v) && toks[i + 1] && (toks[i + 1].v === ";" || toks[i + 1].v === ",") && toks[i + 2] && /^[A-Z]{1,2}$/.test(toks[i + 2].v) && toks[i + 3] && toks[i + 3].v === ")") {
+            const a = colRef(next().v); next(); const b = colRef(next().v); next();
+            return `AG2(${a},${b})`;
+          }
           if (!ROW_FN[low]) throw new Error(`No conozco la función «${t.v}».`);
           const args = [];
           if (peek() && peek().v !== ")") {
@@ -268,8 +275,8 @@
     const body = expr();
     if (i < toks.length) throw new Error(`Sobra «${toks[i].v}».`);
     // eslint-disable-next-line no-new-func
-    const fn = new Function("V", "AG", "F", `"use strict";return (${body});`);
-    return { deps: [...deps], run: (V, AG) => { const r = fn(V, AG, F); return typeof r === "number" && Number.isFinite(r) ? r : NaN; } };
+    const fn = new Function("V", "AG", "F", "AG2", `"use strict";return (${body});`);
+    return { deps: [...deps], run: (V, AG, AG2) => { const r = fn(V, AG, F, AG2); return typeof r === "number" && Number.isFinite(r) ? r : NaN; } };
   }
 
   // Calcula todas las columnas. cols: [{formula}], raw: matriz filas × columnas de textos.
@@ -285,6 +292,12 @@
       const v = !d ? NaN : kind === "sum" ? d.sum : kind === "mean" ? d.mean : kind === "median" ? d.median : kind === "sd" ? d.sd : kind === "n" ? d.n : kind === "min" ? d.min : d.max;
       return (aggCache[key] = v);
     }
+    function agg2(a, b) {
+      const key = a + "w" + b; if (aggCache[key] !== undefined) return aggCache[key];
+      const A = column(a), B = column(b); let sv = 0, sw = 0;
+      A.forEach((v, r) => { if (Number.isFinite(v) && Number.isFinite(B[r])) { sv += v * B[r]; sw += B[r]; } });
+      return (aggCache[key] = sw ? sv / sw : NaN);
+    }
     function column(j) {
       if (state[j] === 2) return out[j];
       if (state[j] === 1) throw new Error("La fórmula depende de sí misma (referencia circular).");
@@ -295,7 +308,7 @@
         try {
           const c = compiled[j] || (compiled[j] = compileFormula(f, nC));
           c.deps.forEach(d => column(d));
-          out[j] = raw.map((_, r) => { const V = out.map((col, k) => (col ? col[r] : NaN)); return c.run(V, agg); });
+          out[j] = raw.map((_, r) => { const V = out.map((col, k) => (col ? col[r] : NaN)); return c.run(V, agg, agg2); });
         } catch (e) { errors[j] = e.message; out[j] = Array(nR).fill(NaN); }
       }
       state[j] = 2;

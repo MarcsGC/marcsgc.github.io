@@ -297,6 +297,21 @@ details.help code{font-family:var(--mono);color:var(--ink)}
 .fs .bar b{font-family:var(--display);font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fs .box{position:relative;flex:1;min-height:0}
 
+
+/* bloqueo con PIN */
+.lock{position:fixed;inset:0;z-index:70;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:24px}
+.lockcard{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:320px;width:100%;text-align:center}
+.lockcard h3{margin:0;font-family:var(--display);font-weight:600;font-size:1.2rem}
+.lockcard p{margin:0;color:var(--muted)}
+.lockcard .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.pindots{display:flex;gap:14px}
+.pindots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--accent)}
+.pindots i.on{background:var(--accent)}
+.keypad{display:grid;grid-template-columns:repeat(3,72px);gap:12px}
+.keypad button{height:72px;border-radius:50%;border:1px solid var(--line);background:var(--sheet);font-size:1.5rem;font-family:var(--display);font-weight:600}
+.keypad button.sm{font-size:.75rem;font-family:var(--body);font-weight:400;color:var(--muted);border-color:transparent;background:transparent}
+.keypad button:active{background:var(--accent-soft)}
+
 /* tutorial */
 .onb{position:fixed;inset:0;z-index:50;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:16px}
 .onb .card{background:var(--sheet);border-radius:18px;max-width:420px;width:100%;padding:24px 20px 18px;display:flex;flex-direction:column;gap:14px;text-align:center}
@@ -399,6 +414,7 @@ details.help code{font-family:var(--mono);color:var(--ink)}
   <p class="hint" id="fsHint" style="text-align:center"></p>
 </div>
 <div class="onb" id="onb" hidden></div>
+<div class="lock" id="lock" hidden></div>
 <div class="toast" id="toast" hidden></div>
 <div class="offscreen" id="offscreen" aria-hidden="true"></div>
 <input type="file" id="fileIn" accept=".csv,.txt,.tsv,.xlsx,.xls,.ods,text/csv" hidden>
@@ -415,6 +431,7 @@ details.help code{font-family:var(--mono);color:var(--ink)}
 <script src="statsview.js"></script>
 <script src="export.js"></script>
 <script src="ocr.js"></script>
+<script src="extras.js"></script>
 <script src="main.js"></script>
 
 </body>

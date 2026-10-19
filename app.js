@@ -92,7 +92,7 @@ const defaultChart = () => ({
   id: uid(), name: "", type: "bar", series: [], one: null, x: null, y: null, model: "linear",
   title: "", xTitle: "", yTitle: "", font: "m", legend: "top", zero: true, showMean: false, showValues: false, bins: null,
   lineIds: [], countCol: LABEL, splitCol: "", countStyle: "bar", countPct: false,
-  lines: [], markMax: false, markMin: false, notes: []
+  lines: [], markMax: false, markMin: false, notes: [], ma7: false, trend: false
 });
 // colDefs: [nombre, fórmula, tipo] · charts: configuraciones con índices de columna
 function mk(name, labelName, colDefs, rows, charts = [{}], stats = {}, extra = {}) {
@@ -116,6 +116,7 @@ function mk(name, labelName, colDefs, rows, charts = [{}], stats = {}, extra = {
     p.charts.push(ch);
   });
   p.activeChart = p.charts[0].id;
+  if (extra.bodyWeight) { p.bodyWeight = true; p.unit = "kg"; }
   Object.entries(stats).forEach(([k, v]) => (p.stats[k] = typeof v === "number" ? id(v) : v === "label" ? LABEL : v));
   return p;
 }
@@ -134,7 +135,26 @@ const TEMPLATES = [
       [{ name: t("Reparto"), type: "doughnut", one: 0, showValues: true, legend: "bottom" }, { name: t("Ranking"), type: "barh", series: [0], showValues: true, markMax: true }]) },
   { key: "peso", name: () => t("Peso corporal"), desc: () => t("Apunta tu peso cada día con un toque: la fecha se pone sola."),
     make: () => mk(t("Peso corporal"), t("Fecha"), [[t("Peso (kg)")], [t("Notas"), null, "text"]], [],
-      [{ name: t("Evolución"), type: "line", series: [0], zero: false, markMin: true, markMax: true }], { sumCol: 0 }, { labelType: "date" }) },
+      [{ name: t("Evolución"), type: "line", series: [0], zero: false, markMin: true, markMax: true, ma7: true, trend: true }], { sumCol: 0 }, { labelType: "date", bodyWeight: true }) },
+  { key: "presupuesto", name: () => t("Presupuesto anual"), desc: () => t("Ingresos, gastos y ahorro de cada mes."),
+    make: () => mk(t("Presupuesto anual"), t("Mes"), [[t("Ingresos")], [t("Gastos")], [t("Ahorro"), "A-B"], [t("% ahorrado"), `${t("redondear")}(C/A*100; 1)`]],
+      [[t("Ene"), "1800", "1450"], [t("Feb"), "1800", "1390"], [t("Mar"), "1850", "1600"], [t("Abr"), "1800", "1420"], [t("May"), "1900", "1510"], [t("Jun"), "2100", "1700"]],
+      [{ name: t("Ingresos y gastos"), type: "bar", series: [0, 1] }, { name: t("Ahorro"), type: "combo", series: [2, 3], lineIds: [3], showValues: true }]) },
+  { key: "ahorro", name: () => t("Hucha de ahorro"), desc: () => t("Apunta lo que llevas ahorrado y mira cuánto te falta."),
+    make: () => mk(t("Hucha de ahorro"), t("Fecha"), [[t("Ahorrado (€)")], [t("Notas"), null, "text"]], [],
+      [{ name: t("Evolución"), type: "area", series: [0], trend: true }], { sumCol: 0 }, { labelType: "date" }) },
+  { key: "tension", name: () => t("Tensión arterial"), desc: () => t("Sistólica, diastólica y pulso, con fecha automática."),
+    make: () => mk(t("Tensión arterial"), t("Fecha"), [[t("Sistólica")], [t("Diastólica")], [t("Pulso")]], [],
+      [{ name: t("Tensión"), type: "line", series: [0, 1], zero: false, ma7: true }, { name: t("Pulso"), type: "line", series: [2], zero: false }], { sumCol: 0 }, { labelType: "date" }) },
+  { key: "glucosa", name: () => t("Glucosa"), desc: () => t("Niveles de glucosa y en qué momento del día se midieron."),
+    make: () => mk(t("Glucosa"), t("Fecha"), [[t("Glucosa (mg/dL)")], [t("Momento"), null, "text"]], [],
+      [{ name: t("Evolución"), type: "line", series: [0], zero: false, ma7: true }, { name: t("Por momento"), type: "box", series: [0] }], { sumCol: 0, testA: 0, testG: 1, testKind: "groups" }, { labelType: "date" }) },
+  { key: "horas", name: () => t("Horas de trabajo"), desc: () => t("Horas por día y proyecto, con totales."),
+    make: () => mk(t("Horas de trabajo"), t("Fecha"), [[t("Horas")], [t("Proyecto"), null, "text"]], [],
+      [{ name: t("Horas por día"), type: "bar", series: [0], showMean: true }, { name: t("Por proyecto"), type: "count", countCol: 1, countStyle: "doughnut", legend: "bottom" }], { sumCol: 0 }, { labelType: "date" }) },
+  { key: "habitos", name: () => t("Hábitos"), desc: () => t("Marca cada día si has cumplido tus hábitos."),
+    make: () => mk(t("Hábitos"), t("Fecha"), [[t("Ejercicio"), null, "text"], [t("Lectura"), null, "text"], [t("Vasos de agua")]], [],
+      [{ name: t("Ejercicio"), type: "count", countCol: 0, countStyle: "doughnut", countPct: true, legend: "bottom" }, { name: t("Agua"), type: "bar", series: [2], lines: [{ value: 8, label: t("Objetivo"), color: "" }] }], { sumCol: 0 }, { labelType: "date" }) },
   { key: "diario", name: () => t("Registro diario"), desc: () => t("Una fila por día: peso, sueño o lo que quieras seguir."),
     make: () => { const ds = lastDays(10), w = ["72,4", "72,1", "72,3", "71,8", "71,9", "71,5", "71,6", "71,2", "71,4", "70,9"], h = ["7", "6,5", "8", "7,5", "6", "7", "8,5", "7", "6,5", "7,5"];
       return mk(t("Registro diario"), t("Fecha"), [[t("Peso (kg)")], [t("Horas de sueño")]], ds.map((d, i) => [d, w[i], h[i]]),
@@ -210,7 +230,7 @@ function trendClass(diff, last, c) {
    Deshacer y rehacer
    ========================================================= */
 const HIST = {};
-const snapFields = ["name", "labelName", "labelType", "cols", "rows", "charts", "filters", "palette", "goal"];
+const snapFields = ["name", "labelName", "labelType", "cols", "rows", "charts", "filters", "palette", "goal", "bodyWeight", "height", "unit"];
 const snap = p => JSON.stringify(snapFields.map(k => p[k]));
 const hist = () => (HIST[state.current] = HIST[state.current] || { past: [], future: [], last: snap(cur()) });
 function track() {
@@ -357,7 +377,11 @@ function openMenu() {
     <div class="menulist">
       ${menuItem("backup", IC.save, t("Guardar copia de seguridad"), t("Todos tus proyectos en un archivo"))}
       ${menuItem("restore", IC.restore, t("Restaurar copia de seguridad"))}
-      ${menuItem("settings", IC.sun, t("Tema e idioma"))}
+      ${menuItem("settings", IC.sun, t("Tema, idioma y PIN"))}
+      ${menuItem("grades", '<path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-7"/>', t("¿Qué nota necesito?"), t("Calcula la nota que te hace falta en el próximo examen"))}
+      ${menuItem("news", '<path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.6 7.1 18.2 8 12.7 4 8.8 9.5 8z"/>', t("Novedades"))}
+      ${menuItem("feedback", '<path d="M4 5h16v11H8l-4 4z"/>', t("Enviar sugerencias o errores"))}
+      ${menuItem("rate", '<path d="M12 21s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 11c0 5.6-7 10-7 10z"/>', t("Valorar la app"))}
       ${menuItem("tutorial", IC.help, t("Ver el tutorial"))}
       ${menuItem("about", IC.info, t("Acerca de Gráficalo"))}
     </div>
@@ -383,6 +407,10 @@ function openMenu() {
     if (act === "settings") settingsSheet();
     if (act === "tutorial") { closeSheet(); showOnboarding(); }
     if (act === "about") aboutSheet();
+    if (act === "grades") gradeSheet();
+    if (act === "news") whatsNewSheet(true);
+    if (act === "feedback") feedbackSheet();
+    if (act === "rate") rateSheet(true);
   });
 }
 function renameSheet() {
@@ -401,8 +429,12 @@ function settingsSheet() {
   openSheet(`<h3>${t("Tema e idioma")}</h3>
     <div class="setrow"><span>${t("Tema")}</span>${seg("theme", [["auto", t("Automático")], ["light", t("Claro")], ["dark", t("Oscuro")]])}</div>
     <div class="setrow"><label for="langSel">${t("Idioma")}</label><select id="langSel">${Object.entries(LANGS).map(([k, n]) => `<option value="${k}" ${k === LANG ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+    <div class="setrow"><span>${t("Bloqueo con PIN")}</span><div class="grp">${settings.pin ? `<button class="btn small" data-act="pin:set">${t("Cambiar")}</button><button class="btn small danger" data-act="pin:off">${t("Quitar")}</button>` : `<button class="btn small" data-act="pin:set">${t("Activar")}</button>`}</div></div>
+    <p class="hint">${t("El PIN evita que otros abran la app en tu móvil. No cifra los datos.")}</p>
     <div class="actions"><button class="btn primary" data-act="close">${t("Hecho")}</button></div>`,
   act => {
+    if (act === "pin:set") return pinSetSheet();
+    if (act === "pin:off") { delete settings.pin; saveSettings(); toast(t("PIN quitado")); return settingsSheet(); }
     const [k, v] = act.split(":");
     if (k === "theme") { settings.theme = v; saveSettings(); applyTheme(); renderTable(); refresh(); settingsSheet(); }
   });
@@ -433,7 +465,7 @@ function aboutSheet() {
     <p class="hint"><a href="privacidad.html" target="_blank" rel="noopener" style="color:var(--accent)">${t("Política de privacidad")}</a></p>
     <div class="actions"><button class="btn primary" data-act="close">${t("Cerrar")}</button></div>`, () => {});
 }
-const APP_VERSION = "0.3";
+const APP_VERSION = "0.4";
 
 /* =========================================================
    Tabla de datos
@@ -544,7 +576,7 @@ function openColumn(id, isNew = false) {
   const p = cur(), c = colById(id), j = p.cols.indexOf(c);
   const letters = p.cols.map((_, k) => L(k)).filter((_, k) => k !== j && p.cols[k].kind !== "text");
   const a = letters[0] || "A", b = letters[1] || a, sep = decimalComma() ? ";" : ",";
-  const ex = [`${a}+${b}`, `${a}-${b}`, `(${a}+${b})/2`, `${a}/${t("suma")}(${a})*100`, `${t("redondear")}(${a}${sep} 1)`, `${a}-${t("media")}(${a})`, `${t("si")}(${a}>=5${sep} 1${sep} 0)`];
+  const ex = [`${a}+${b}`, `${a}-${b}`, `(${a}+${b})/2`, `${a}/${t("suma")}(${a})*100`, `${t("redondear")}(${a}${sep} 1)`, `${a}-${t("media")}(${a})`, `${t("si")}(${a}>=5${sep} 1${sep} 0)`, `${t("ponderada")}(${a}${sep} 30${sep} ${b}${sep} 70)`, `${t("mediap")}(${a}${sep} ${b})`];
   let kind = c.kind, autoColor = !c.color;
   openSheet(`<h3>${t("Columna {l}", { l: L(j) })}</h3>
     <div class="row2">
@@ -563,6 +595,8 @@ function openColumn(id, isNew = false) {
         <li>${t("Letras de columna: {a} y números", { a: "<code>A</code>, <code>B</code>…" })}</li>
         <li>${t("Operaciones:")} <code>+ - * / ^</code> ${t("y paréntesis")}</li>
         <li>${t("Por fila:")} <code>${t("redondear")}(x${sep} n)</code>, <code>${t("raiz")}(x)</code>, <code>abs(x)</code>, <code>ln(x)</code>, <code>log(x)</code>, <code>exp(x)</code>, <code>${t("pot")}(x${sep} n)</code>, <code>min(…)</code>, <code>max(…)</code>, <code>${t("si")}(${t("condición")}${sep} ${t("sí")}${sep} no)</code></li>
+        <li>${t("Media ponderada de una fila:")} <code>${t("ponderada")}(${t("nota")}1${sep} ${t("peso")}1${sep} ${t("nota")}2${sep} ${t("peso")}2…)</code></li>
+        <li>${t("Media ponderada de una columna con los pesos de otra:")} <code>${t("mediap")}(A${sep} B)</code></li>
         <li>${t("De toda la columna:")} <code>${t("suma")}(A)</code>, <code>${t("media")}(A)</code>, <code>${t("mediana")}(A)</code>, <code>${t("desv")}(A)</code>, <code>${t("contar")}(A)</code>, <code>min(A)</code>, <code>max(A)</code></li>
         <li>${t("Separa los argumentos con {s}", { s: `<code>${sep}</code>` })}</li></ul></details>
     </div>
@@ -931,7 +965,7 @@ function renderQuick() {
   const html = pre => `<div class="qhead"><b>${t("Registro rápido")}</b>
       <span class="qdate">${isToday ? t("Hoy") + ", " : ""}<input type="date" data-q="date" value="${date}" max="${todayISO()}" aria-label="${t("Fecha")}"></span></div>
     <div class="qfields">${quickCols().map(c => `<label>${esc(colName(c))}<input type="text" ${c.kind === "num" ? 'inputmode="decimal"' : 'class="txt"'} data-qc="${c.id}" id="${pre}_${c.id}" value="${esc(row ? row.c[c.id] ?? "" : "")}" placeholder="${esc(ph(c))}" enterkeyhint="done" autocomplete="off"></label>`).join("")}</div>
-    <div class="qrow"><button class="btn primary" data-q="save">${ICON(row ? IC.edit : IC.plus)}${row ? t("Actualizar") : t("Guardar")}</button>${first ? `<button class="btn" data-q="goal">${t("Objetivo")}${Number.isFinite(p.goal) ? ": " + fmt(p.goal) : ""}</button>` : ""}</div>
+    <div class="qrow"><button class="btn primary" data-q="save">${ICON(row ? IC.edit : IC.plus)}${row ? t("Actualizar") : t("Guardar")}</button>${first ? `<button class="btn" data-q="goal" title="${t("Objetivo y ajustes")}">${ICON('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.5"/>')}${Number.isFinite(p.goal) ? fmt(p.goal) : t("Objetivo")}</button>` : ""}</div>
     ${stats ? `<div class="qstats">${stats}</div>` : ""}`;
   const focused = document.activeElement && document.activeElement.closest(".quick") ? document.activeElement.id : null;
   $("#quick").innerHTML = html("qd"); $("#quickPanel").innerHTML = html("qp");
@@ -950,6 +984,17 @@ function quickStats(c) {
   const wk = pts.filter(x => x[0] > last[0] - 7 * 864e5).map(x => x[1]);
   if (wk.length > 1) out.push(`<span>${t("Media 7 días")}: <b>${fmt(S.mean(wk))}</b></span>`);
   if (Number.isFinite(p.goal)) { const r = last[1] - p.goal; out.push(Math.abs(r) < 1e-9 ? `<span class="up">${t("¡Objetivo conseguido!")}</span>` : `<span>${t("A {x} del objetivo", { x: `<b>${fmt(Math.abs(r))}</b>` })}</span>`); }
+  const tr = trendInfo(c.id);
+  if (tr) {
+    const wkRate = tr.slope * 7;
+    out.push(`<span>${t("Ritmo")}: <b>${wkRate > 0 ? "+" : wkRate < 0 ? "−" : ""}${fmt(Math.abs(wkRate))}</b> ${t("por semana")}</span>`);
+    if (Number.isFinite(p.goal) && Math.abs(last[1] - p.goal) > 1e-9) out.push(tr.eta ? `<span class="up">${t("A este ritmo, objetivo el {d}", { d: fmtDate(isoOf(new Date(tr.eta)), new Date(tr.eta).getFullYear() !== new Date().getFullYear()) })}</span>` : `<span>${t("A este ritmo no te acercas al objetivo")}</span>`);
+  }
+  if (p.bodyWeight && p.height > 0 && c === p.cols.find(x => x.kind === "num")) {
+    const kg = p.unit === "lb" ? last[1] / 2.20462 : last[1], bmi = kg / (p.height / 100) ** 2;
+    const cat = bmi < 18.5 ? t("bajo peso") : bmi < 25 ? t("normal") : bmi < 30 ? t("sobrepeso") : t("obesidad");
+    out.push(`<span>${t("IMC")}: <b>${fmt(bmi, 1)}</b> (${cat})</span>`);
+  }
   return out.join("");
 }
 function quickSave(box) {
@@ -968,23 +1013,67 @@ function quickSave(box) {
   toast(existed ? t("Actualizado · {d}", { d: fmtDate(date, true) }) : t("Guardado · {d}", { d: fmtDate(date, true) }), t("Deshacer"), undo);
   document.activeElement?.blur?.();
 }
-function goalSheet() {
-  const p = cur();
-  openSheet(`<h3>${t("Objetivo")}</h3><p class="hint">${t("Aparecerá como una línea en tus gráficos y verás cuánto te falta.")}</p>
-    <div class="field"><input type="text" inputmode="decimal" id="goalIn" value="${Number.isFinite(p.goal) ? esc(String(p.goal).replace(".", DEC())) : ""}" placeholder="${t("Ej.: 70")}" style="font-family:var(--mono);font-size:1.4rem"></div>
+// recta de tendencia de los últimos 30 días (o de todos si hay menos) y fecha estimada para llegar al objetivo
+function trendInfo(colId) {
+  const p = cur(), d = data(); if (!d.ts) return null;
+  const pts = []; d.series(colId).forEach((v, k) => { if (v != null && Number.isFinite(d.ts[k])) pts.push([d.ts[k], v]); });
+  if (pts.length < 3) return null;
+  pts.sort((a, b) => a[0] - b[0]);
+  const lastTs = pts[pts.length - 1][0], win = pts.filter(x => x[0] >= lastTs - 30 * 864e5), use = win.length >= 3 ? win : pts.slice(-3);
+  if ((use[use.length - 1][0] - use[0][0]) / 864e5 < 2) return null;
+  const f = S.fit("linear", use.map(x => x[0] / 864e5), use.map(x => x[1]));
+  if (f.error) return null;
+  const slope = f.coefs[1], at = day => f.coefs[0] + slope * day, lastDay = lastTs / 864e5;
+  let eta = null;
+  if (Number.isFinite(p.goal) && slope) {
+    const day = (p.goal - f.coefs[0]) / slope;
+    if (day > lastDay && day - lastDay <= 730) eta = Math.round(day) * 864e5;
+  }
+  return { slope, at, eta, fromTs: use[0][0], lastTs };
+}
+function trackSheet() {
+  const p = cur(), first = p.cols.find(c => c.kind === "num");
+  openSheet(`<h3>${t("Objetivo y ajustes")}</h3>
+    <div class="field"><label class="label" for="goalIn">${t("Objetivo")}</label><input type="text" inputmode="decimal" id="goalIn" value="${Number.isFinite(p.goal) ? esc(String(p.goal).replace(".", DEC())) : ""}" placeholder="${t("Ej.: 70")}" style="font-family:var(--mono);font-size:1.3rem">
+      <p class="hint">${t("Aparecerá como una línea en tus gráficos y verás cuánto te falta.")}</p></div>
+    <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bwChk" ${p.bodyWeight ? "checked" : ""}> ${t("Es mi peso corporal (calcular IMC)")}</label>
+    <div id="bwBox" class="row2" ${p.bodyWeight ? "" : "hidden"}>
+      <div class="field"><label class="label" for="hIn">${t("Altura (cm)")}</label><input type="text" inputmode="decimal" id="hIn" value="${p.height || ""}" placeholder="170"></div>
+      <div class="field"><span class="label">${t("Unidad")}</span><div class="seg" role="group" id="unitSeg" data-u="${p.unit || "kg"}"><button data-act="u:kg" aria-pressed="${(p.unit || "kg") === "kg"}">kg</button><button data-act="u:lb" aria-pressed="${p.unit === "lb"}">lb</button></div></div>
+    </div>
+    <p class="hint" id="bwHint" ${p.bodyWeight ? "" : "hidden"}>${t("El IMC es orientativo: no tiene en cuenta la masa muscular ni la edad.")}</p>
     <div class="actions"><button class="btn ghost" data-act="rm" ${Number.isFinite(p.goal) ? "" : "disabled"}>${t("Quitar objetivo")}</button><button class="btn primary" data-act="ok">${t("Guardar")}</button></div>`,
   act => {
+    if (act.startsWith("u:")) { $$("#unitSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.act === act)); $("#unitSeg").dataset.u = act.slice(2); return; }
     const label = t("Objetivo");
     const setLines = v => p.charts.forEach(ch => { ch.lines = (ch.lines || []).filter(l => !l._goal); if (Number.isFinite(v) && ["line", "area", "bar", "combo"].includes(ch.type)) ch.lines.push({ value: v, label, color: "", _goal: true }); });
-    if (act === "ok") { const v = S.parseNum($("#goalIn").value); if (!Number.isFinite(v)) { toast(t("Escribe un número")); return; } p.goal = v; setLines(v); }
-    if (act === "rm") { delete p.goal; setLines(NaN); }
-    if (act === "ok" || act === "rm") { persist(); refresh(); closeSheet(); }
+    if (act === "rm") { delete p.goal; setLines(NaN); persist(); refresh(); closeSheet(); return; }
+    if (act !== "ok") return;
+    const gv = $("#goalIn").value.trim(), g = S.parseNum(gv);
+    if (gv && !Number.isFinite(g)) { toast(t("Escribe un número")); return; }
+    p.bodyWeight = $("#bwChk").checked;
+    let goal = gv ? g : p.goal;
+    if (p.bodyWeight) {
+      const h = S.parseNum($("#hIn").value); if (Number.isFinite(h) && h > 50 && h < 260) p.height = h;
+      const newU = $("#unitSeg").dataset.u || "kg";
+      if (first && newU !== (p.unit || "kg")) { p.goal = goal; convertUnit(p, first, newU); goal = p.goal; }
+      p.unit = newU;
+    }
+    if (Number.isFinite(goal)) { p.goal = goal; setLines(goal); }
+    dirty(); persist(); renderTable(); refresh(); closeSheet();
   });
-  setTimeout(() => $("#goalIn").select(), 60);
+  $("#bwChk").addEventListener("change", e => { $("#bwBox").hidden = !e.target.checked; $("#bwHint").hidden = !e.target.checked; });
+}
+function convertUnit(p, col, to) {
+  const k = to === "lb" ? 2.20462 : 1 / 2.20462, f = v => String(Math.round(v * k * 10) / 10).replace(".", DEC());
+  p.rows.forEach(r => { const v = S.parseNum(r.c[col.id]); if (Number.isFinite(v)) r.c[col.id] = f(v); });
+  if (Number.isFinite(p.goal)) p.goal = Math.round(p.goal * k * 10) / 10;
+  col.name = col.name.replace(to === "lb" ? /\(kg\)/ : /\(lb\)/, to === "lb" ? "(lb)" : "(kg)");
+  toast(t("Valores convertidos a {u}", { u: to }));
 }
 ["#quick", "#quickPanel"].forEach(sel => {
   const box = $(sel);
-  box.addEventListener("click", e => { const b = e.target.closest("[data-q]"); if (!b || b.tagName === "INPUT") return; if (b.dataset.q === "save") quickSave(box); if (b.dataset.q === "goal") goalSheet(); });
+  box.addEventListener("click", e => { const b = e.target.closest("[data-q]"); if (!b || b.tagName === "INPUT") return; if (b.dataset.q === "save") quickSave(box); if (b.dataset.q === "goal") trackSheet(); });
   box.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("[data-qc]")) { e.preventDefault(); quickSave(box); } });
   box.addEventListener("change", e => { if (e.target.dataset.q === "date") { quickDate = e.target.value && e.target.value !== todayISO() ? e.target.value : null; renderQuick(); } });
 });
