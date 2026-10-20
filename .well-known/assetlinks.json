@@ -1,8 +1,11 @@
 [{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "io.github.marcsgc.twa",
-        "sha256_cert_fingerprints": ["E7:10:E7:2B:CF:8D:DB:93:F0:80:76:EC:FA:2C:20:8B:8D:AE:98:27:4C:2F:B7:55:0D:01:BB:8F:CF:73:E6:9C"]
-      }
-    }]
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "io.github.marcsgc.twa",
+    "sha256_cert_fingerprints": [
+      "47:C9:02:10:32:B5:1B:2A:9C:BA:EF:95:E0:7E:6F:8E:93:0E:11:3E:9E:E9:AA:91:B7:57:52:E5:5C:28:B7:A1",
+      "E7:10:E7:2B:CF:8D:DB:93:F0:80:76:EC:FA:2C:20:8B:8D:AE:98:27:4C:2F:B7:55:0D:01:BB:8F:CF:73:E6:9C"
+    ]
+  }
+}]
