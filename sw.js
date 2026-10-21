@@ -8,8 +8,9 @@ const CORE = ["./", "index.html", "i18n.js", "stats.js", "app.js", "charts.js", 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
 });
+// Solo borra sus propias cachés antiguas: otras apps del mismo dominio (como /formidex/) guardan las suyas aquí.
 self.addEventListener("activate", e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith("graficalo-") && k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
