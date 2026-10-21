@@ -24,8 +24,8 @@
 })();
 </script>
 <style>
-:root{--paper:#f4f7f5;--sheet:#fff;--grid:#e1e9e5;--ink:#17231f;--muted:#5b6b65;--line:#cfdad5;--accent:#0e6b5c}
-@media (prefers-color-scheme:dark){:root{--paper:#0f1513;--sheet:#161e1b;--grid:#1d2824;--ink:#e3ece8;--muted:#93a59e;--line:#2a3833;--accent:#4cc3aa;color-scheme:dark}}
+:root{--warn:#8a5208;--warnbg:#fdf3e3;--warnline:#ecd2a8;--paper:#f4f7f5;--sheet:#fff;--grid:#e1e9e5;--ink:#17231f;--muted:#5b6b65;--line:#cfdad5;--accent:#0e6b5c}
+@media (prefers-color-scheme:dark){:root{--warn:#e8a646;--warnbg:#2a2111;--warnline:#5a4420;--paper:#0f1513;--sheet:#161e1b;--grid:#1d2824;--ink:#e3ece8;--muted:#93a59e;--line:#2a3833;--accent:#4cc3aa;color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{min-height:100%}
 body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -33,6 +33,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,-
 main{max-width:720px;margin:0 auto;padding:48px max(16px,env(safe-area-inset-left)) 40px}
 h1{margin:0 0 6px;font-size:clamp(2rem,8vw,2.8rem);line-height:1.05;letter-spacing:-.02em}
 .sub{margin:0 0 28px;color:var(--muted)}
+.app em{font-style:normal;font-size:.7rem;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--warn);border:1px solid var(--warnline);background:var(--warnbg);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:3px;white-space:nowrap}
 .apps{display:grid;gap:12px}
 .app{display:grid;grid-template-columns:64px 1fr auto;gap:16px;align-items:center;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--sheet);color:inherit;text-decoration:none;box-shadow:0 1px 0 var(--line)}
 .app:hover{border-color:var(--accent)}
@@ -52,18 +53,19 @@ footer a{color:var(--accent)}
   <div class="apps">
     <a class="app" href="/graficalo/">
       <img src="/graficalo/icons/icon-192.png" alt="">
-      <div><b>Gráficalo</b><span data-es="Gráficos y estadísticas: apunta tus datos y míralos crecer." data-en="Charts and statistics: log your data and watch it grow.">Gráficos y estadísticas: apunta tus datos y míralos crecer.</span></div>
+      <div><b>Gráficalo <em title="Todavía en desarrollo: puede tener fallos y cambiar a menudo" data-es="En desarrollo" data-en="In development">En desarrollo</em></b><span data-es="Gráficos y estadísticas: apunta tus datos y míralos crecer." data-en="Charts and statistics: log your data and watch it grow.">Gráficos y estadísticas: apunta tus datos y míralos crecer.</span></div>
       <i aria-hidden="true">→</i>
     </a>
     <a class="app" href="/formidex/">
       <img src="/formidex/pwa-192x192.png" alt="">
-      <div><b>Formidex</b><span data-es="Registro de hormigas en el mapa y fichas de cría." data-en="Ant records on the map and breeding sheets.">Registro de hormigas en el mapa y fichas de cría.</span></div>
+      <div><b>Formidex <em title="Todavía en desarrollo: puede tener fallos y cambiar a menudo" data-es="En desarrollo" data-en="In development">En desarrollo</em></b><span data-es="Registro de hormigas en el mapa y fichas de cría." data-en="Ant records on the map and breeding sheets.">Registro de hormigas en el mapa y fichas de cría.</span></div>
       <i aria-hidden="true">→</i>
     </a>
   </div>
   <footer>
     <a href="https://play.google.com/store/apps/details?id=io.github.marcsgc.twa" data-es="Gráficalo en Google Play" data-en="Gráficalo on Google Play">Gráficalo en Google Play</a> ·
-    <a href="/graficalo/privacidad.html" data-es="Privacidad de Gráficalo" data-en="Gráficalo privacy">Privacidad de Gráficalo</a>
+    <a href="/graficalo/privacidad.html" data-es="Privacidad de Gráficalo" data-en="Gráficalo privacy">Privacidad de Gráficalo</a> ·
+    <a href="mailto:cuentapersonalmgc@gmail.com" data-es="Escríbeme" data-en="Contact">Escríbeme</a>
   </footer>
 </main>
 <script>
