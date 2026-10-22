@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Marcos García Cabrero</title>
-<meta name="description" content="Estudiante de Ingeniería Informática del Software en Oviedo. Hago apps web sencillas (Gráficalo, Formidex) y crío hormigas.">
+<meta name="description" content="Estudiante de Ingeniería Informática del Software en la Universidad de Oviedo. Programación, hormigas y proyectos.">
 <meta property="og:title" content="Marcos García Cabrero">
-<meta property="og:description" content="Ingeniería Informática del Software · Universidad de Oviedo. Apps: Gráficalo y Formidex.">
+<meta property="og:description" content="Ingeniería Informática del Software · Universidad de Oviedo.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://marcsgc.github.io/">
 <meta name="theme-color" content="#0d1117">
@@ -88,6 +88,13 @@ section h2 b{color:var(--green);font-weight:400}
 .proj:hover{border-color:var(--green);color:var(--ink)}
 .proj .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px 12px;flex-wrap:wrap}
 .proj .name{font-size:22px;color:var(--bright);font-weight:700}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.badge.ai{color:#d2a8ff;border-color:#4b3a6b}
+.projects{display:flex;flex-direction:column}
+.projects h2+.empty,.projects h2+.note{margin:-6px 0 16px;color:var(--muted);font-size:14px}
+.projects .empty{margin-bottom:28px!important}
+.card .tags{line-height:1.9}
+#sobre-mi.grid2{grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))}
 .badge{font-size:12px;color:var(--amber);border:1px solid var(--amberline);border-radius:999px;padding:2px 10px;white-space:nowrap}
 .proj p{margin:0;font-size:15px}
 .proj .stack{font-size:13px;color:var(--muted)}
@@ -127,8 +134,8 @@ footer a:hover{color:var(--bright)}
       <h1>Marcos García Cabrero<span class="cursor" aria-hidden="true">_</span></h1>
       <p class="lead es">Estudiante de 3.º de <span class="hl">Ingeniería Informática del Software</span> en la Universidad de Oviedo. De Torrelavega, Cantabria.</p>
       <p class="lead en">Third-year <span class="hl">Software Engineering</span> student at the University of Oviedo, Spain. From Torrelavega, Cantabria.</p>
-      <p class="comment es">// hago apps web sencillas y crío hormigas</p>
-      <p class="comment en">// I build simple web apps and keep ants</p>
+      <p class="comment es">// me gusta programar y crío hormigas</p>
+      <p class="comment en">// I love programming and I keep ants</p>
     </div>
   </div>
 </header>
@@ -137,6 +144,7 @@ footer a:hover{color:var(--bright)}
   <div class="card">
     <p class="k"><span class="es">const intereses = [</span><span class="en">const interests = [</span></p>
     <p class="v ind"><span class="str es">"programación",</span><span class="str en">"programming",</span></p>
+    <p class="v ind"><span class="str es">"apps web y PWA",</span><span class="str en">"web apps and PWAs",</span></p>
     <p class="v ind"><span class="str es">"hormigas",</span><span class="str en">"ants",</span></p>
     <p class="k">];</p>
   </div>
@@ -147,19 +155,35 @@ footer a:hover{color:var(--bright)}
     <p class="k" style="margin-top:10px"><span class="es">estudios:</span><span class="en">education:</span></p>
     <p class="v ind"><span class="es">Universidad de Oviedo <span class="dim">— 3.º</span></span><span class="en">University of Oviedo <span class="dim">— 3rd year</span></span></p>
   </div>
+  <div class="card">
+    <p class="k"><span class="es">const lenguajes = [</span><span class="en">const languages = [</span></p>
+    <p class="v ind tags"><span class="str">"Java"</span>, <span class="str">"C#"</span>, <span class="str">"C/C++"</span>, <span class="str">"Python"</span>, <span class="str">"Kotlin"</span>, <span class="str">"SQL"</span>, <span class="str">"PL/SQL"</span>, <span class="str">"Bash"</span>, <span class="str"><span class="es">"Ensamblador"</span><span class="en">"Assembly"</span></span>, <span class="str">"HTML"</span>, <span class="str">"CSS"</span>, <span class="str">"XML"</span></p>
+    <p class="k">];</p>
+  </div>
+  <div class="card">
+    <p class="k"><span class="es">herramientas:</span><span class="en">tools:</span></p>
+    <p class="v ind">Git <span class="dim">— <span class="es">control de versiones</span><span class="en">version control</span></span></p>
+    <p class="v ind">.NET <span class="dim">— C#</span></p>
+    <p class="v ind">Maven <span class="dim">— Java</span></p>
+    <p class="v ind">JUnit <span class="dim">— <span class="es">pruebas</span><span class="en">testing</span></span></p>
+  </div>
 </section>
 
-<section id="proyectos">
-  <h2><b>$</b> ls ~/<span class="es">proyectos</span><span class="en">projects</span></h2>
+<section id="proyectos" class="projects">
+  <h2><b>$</b> ls ~/<span class="es">proyectos/mios</span><span class="en">projects/mine</span></h2>
+  <p class="empty"><span class="es">// aquí irán los proyectos que programe yo</span><span class="en">// projects I code myself will go here</span></p>
+
+  <h2><b>$</b> ls ~/<span class="es">proyectos/hechos-con-ia</span><span class="en">projects/built-with-ai</span></h2>
+  <p class="note"><span class="es">// ideas mías, programadas por completo con IA. No las cuento como código mío.</span><span class="en">// my ideas, entirely coded with AI. I don't count them as my own code.</span></p>
   <div class="grid2">
     <a class="proj" href="/graficalo/">
-      <div class="top"><span class="name">graficalo/</span><span class="badge"><span data-ver="graficalo"></span><span class="es">en desarrollo</span><span class="en">in development</span></span></div>
+      <div class="top"><span class="name">graficalo/</span><span class="tagrow"><span class="badge ai"><span class="es">hecho con IA</span><span class="en">built with AI</span></span><span class="badge"><span data-ver="graficalo"></span><span class="es">en desarrollo</span><span class="en">in development</span></span></span></div>
       <p class="es">Gráficos y estadísticas desde el móvil. Apunta tus datos y míralos crecer. También en Google Play.</p>
       <p class="en">Charts and statistics on your phone. Log your data and watch it grow. Also on Google Play.</p>
       <p class="stack">JavaScript · PWA · Chart.js</p>
     </a>
     <a class="proj" href="/formidex/">
-      <div class="top"><span class="name">formidex/</span><span class="badge"><span data-ver="formidex"></span><span class="es">en desarrollo</span><span class="en">in development</span></span></div>
+      <div class="top"><span class="name">formidex/</span><span class="tagrow"><span class="badge ai"><span class="es">hecho con IA</span><span class="en">built with AI</span></span><span class="badge"><span data-ver="formidex"></span><span class="es">en desarrollo</span><span class="en">in development</span></span></span></div>
       <p class="es">Registro de hormigas en el mapa y fichas de cría para tus colonias.</p>
       <p class="en">Ant records on a map and breeding sheets for your colonies.</p>
       <p class="stack">React · TypeScript · PWA</p>
